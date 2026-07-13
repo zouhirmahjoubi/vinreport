@@ -23,6 +23,29 @@ SMTP_HOST = os.environ.get("SMTP_HOST", "mail.spacemail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
 
+def extract_specs(car_data):
+    content = car_data.get("content", {})
+    main_info = content.get("main", {})
+    raw_vehicle = main_info.get("vehicleDataRaw", {})
+    
+    section_specs = content.get("section_specs", {})
+    vehicle_data_specs = section_specs.get("vehicleDataSpecs", {})
+    engine_info = section_specs.get("engine", {})
+    
+    year = raw_vehicle.get("year") or vehicle_data_specs.get("year", {}).get("txt", "N/A")
+    make = raw_vehicle.get("make") or "N/A"
+    model = raw_vehicle.get("model") or "N/A"
+    
+    # Try to get engine name/brand, fallback to raw engine text, then "N/A"
+    engine_type = engine_info.get("Brand Name") or vehicle_data_specs.get("engine", {}).get("txt") or "N/A"
+    
+    return {
+        "year": year,
+        "make": make,
+        "model": model,
+        "engine_type": engine_type
+    }
+
 def generate_pdf_report(target_vin, specs):
     pdf = FPDF()
     pdf.add_page()
@@ -379,7 +402,7 @@ def handle_etsy_order():
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
         car_data = car_response.json()
-        specs = car_data.get("specifications", {})
+        specs = extract_specs(car_data)
     except Exception as e:
         return jsonify({"status": "failed", "error": f"GoodCar API call failed: {str(e)}"}), 500
 
@@ -411,9 +434,15 @@ def test_report():
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
         car_data = car_response.json()
-        return jsonify({"status": "success", "raw_car_data": car_data}), 200
+        specs = extract_specs(car_data)
     except Exception as e:
         return jsonify({"status": "failed", "error": f"GoodCar API call failed: {str(e)}"}), 500
+
+    try:
+        send_vin_report(target_vin, customer_email, specs)
+        return jsonify({"status": "success", "message": f"Test report for VIN {target_vin} sent to {customer_email}"}), 200
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"Email sending failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Fallback default port for local testing

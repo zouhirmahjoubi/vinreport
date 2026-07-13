@@ -96,11 +96,19 @@ class TestVinReportApp(unittest.TestCase):
         # Mock GoodCar API response
         mock_car_response = MagicMock()
         mock_car_response.json.return_value = {
-            "specifications": {
-                "year": 2020,
-                "make": "Toyota",
-                "model": "Camry",
-                "engine_type": "V6"
+            "content": {
+                "main": {
+                    "vehicleDataRaw": {
+                        "make": "Toyota",
+                        "model": "Camry",
+                        "year": "2020"
+                    }
+                },
+                "section_specs": {
+                    "engine": {
+                        "Brand Name": "V6"
+                    }
+                }
             }
         }
         mock_post.return_value = mock_car_response
@@ -137,7 +145,7 @@ class TestVinReportApp(unittest.TestCase):
         mock_send_email.assert_called_once_with(
             '1HGCR2F81HA000000',
             'customer@example.com',
-            {"year": 2020, "make": "Toyota", "model": "Camry", "engine_type": "V6"}
+            {"year": "2020", "make": "Toyota", "model": "Camry", "engine_type": "V6"}
         )
 
     def test_handle_etsy_webhook_ignored_event(self):
@@ -214,11 +222,19 @@ class TestVinReportApp(unittest.TestCase):
         # Mock GoodCar API response
         mock_car_response = MagicMock()
         mock_car_response.json.return_value = {
-            "specifications": {
-                "year": 2018,
-                "make": "Honda",
-                "model": "Accord",
-                "engine_type": "I4"
+            "content": {
+                "main": {
+                    "vehicleDataRaw": {
+                        "make": "Honda",
+                        "model": "Accord",
+                        "year": "2018"
+                    }
+                },
+                "section_specs": {
+                    "engine": {
+                        "Brand Name": "I4"
+                    }
+                }
             }
         }
         mock_post.return_value = mock_car_response
@@ -238,7 +254,7 @@ class TestVinReportApp(unittest.TestCase):
         mock_send_email.assert_called_once_with(
             '1HGCR2F81HA000000',
             'test_customer@example.com',
-            {"year": 2018, "make": "Honda", "model": "Accord", "engine_type": "I4"}
+            {"year": "2018", "make": "Honda", "model": "Accord", "engine_type": "I4"}
         )
 
 if __name__ == '__main__':
