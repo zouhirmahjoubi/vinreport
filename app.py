@@ -23,13 +23,29 @@ SMTP_HOST = os.environ.get("SMTP_HOST", "mail.spacemail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
 
+# ─────────────────────────────────────────────────────────────
+# HTML STRIPPER / CLEANER
+# ─────────────────────────────────────────────────────────────
+
+def clean_html(text):
+    if not text:
+        return ""
+    t = str(text).strip()
+    # Replace common HTML tags with readable text/newlines
+    t = t.replace("<p>", "").replace("</p>", "\n\n")
+    t = t.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+    # Strip any other tags
+    t = re.sub(r'<[^>]+>', '', t)
+    # Decode common HTML entities
+    t = t.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&#39;", "'").replace("&quot;", '"').replace("&nbsp;", " ")
+    return t.strip()
 
 # ─────────────────────────────────────────────────────────────
 # DATA EXTRACTION  -  captures ALL GoodCar API sections
 # ─────────────────────────────────────────────────────────────
 
 def extract_all_data(car_data):
-    """Extract all 14+ sections from the GoodCar API response."""
+    """Extract all 15+ sections from the GoodCar API response."""
     content       = car_data.get("content", {})
     main_info     = content.get("main", {})
     raw_vehicle   = main_info.get("vehicleDataRaw", {})
@@ -69,6 +85,7 @@ def extract_all_data(car_data):
         "accidents_v":       content.get(acc_key_v, {}),
         "accidents_a":       content.get(acc_key_a, {}),
         "accidents_null":    content.get(acc_key_null, {}),
+        "accidents":         content.get("section_accidents", {}),
         "junk":              content.get("section_junk", {}),
         "loss":              content.get("section_loss", {}),
         "title_issues":      content.get("section_title_issues", {}),
@@ -79,13 +96,17 @@ def extract_all_data(car_data):
         "maintenance":       content.get("section_maintenance_schedule", {}),
         "crash_test":        content.get("section_crash_test", {}),
         "awards":            content.get("section_awards", {}),
+        # Newly discovered sections
+        "warranties":              content.get("section_warranties", {}),
+        "cost_ownership":          content.get("section_cost_ownership", {}),
+        "location":                content.get("section_location", {}),
+        "mfr":                     content.get("section_mfr", {}),
+        "title_ownership_history": content.get("section_title_ownership_history", {}),
     }
-
 
 # Backward-compatibility alias
 def extract_specs(car_data):
     return extract_all_data(car_data)
-
 
 def _safe(val, max_len=95):
     """Return a PDF-safe, truncated string."""
@@ -96,9 +117,8 @@ def _safe(val, max_len=95):
         s = s[:max_len - 3] + "..."
     return s
 
-
 # ─────────────────────────────────────────────────────────────
-# COMPREHENSIVE PDF GENERATOR  (14 sections)
+# COMPREHENSIVE PDF GENERATOR  (15+ sections)
 # ─────────────────────────────────────────────────────────────
 
 def generate_pdf_report(target_vin, data):
@@ -153,6 +173,27 @@ def generate_pdf_report(target_vin, data):
         tc(*C_TEXT_DARK); pdf.set_font("Helvetica", "", 8)
         pdf.cell(EW - col_w, 6, " " + v, border="B", fill=True,
                  new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    def draw_table_data(thead, tbody, col_widths):
+        if not thead or not tbody:
+            return
+        # Header row
+        fc(*C_DARK_BLUE); tc(*C_WHITE)
+        pdf.set_font("Helvetica", "B", 8)
+        for i, h in enumerate(thead):
+            pdf.cell(col_widths[i], 7, f" {h}", border="B", fill=True)
+        pdf.ln(7)
+        # Body rows
+        pdf.set_font("Helvetica", "", 7.5)
+        for r_idx, row in enumerate(tbody):
+            alt_row = (r_idx % 2 == 1)
+            fc(*C_ALT_ROW) if alt_row else fc(*C_WHITE)
+            tc(*C_TEXT_DARK)
+            for i, val in enumerate(row):
+                val_s = str(val).strip()
+                pdf.cell(col_widths[i], 6, f" {val_s}", border="B", fill=True)
+            pdf.ln(6)
+        pdf.ln(3)
 
     def no_data(msg="No records found."):
         tc(*C_MID_GRAY); pdf.set_font("Helvetica", "I", 8)
@@ -218,9 +259,9 @@ def generate_pdf_report(target_vin, data):
     pdf.ln(6); tc(*C_TEXT_DARK)
 
     # ═══════════════════════════════════════════════════════
-    # 1 - VEHICLE SPECIFICATIONS
+    # 1 - AUTO SPECIFICATIONS & MANUFACTURER INFO
     # ═══════════════════════════════════════════════════════
-    section_header("Vehicle Specifications")
+    section_header("Auto Specifications & Manufacturer")
 
     vds  = data.get("vehicle_data_specs", {})
     eng  = data.get("engine", {})
@@ -305,10 +346,24 @@ def generate_pdf_report(target_vin, data):
         for i, (lbl, val) in enumerate(wd_fields):
             kv_row(lbl, val, alt=(i % 2 == 1))
 
+    mfr_data = data.get("mfr", {})
+    mfr_info = mfr_data.get("manufacturer", {})
+    if mfr_info:
+        mini_header("Manufacturer Information")
+        kv_row("Brand Name", mfr_info.get("carBrand"), alt=False)
+        kv_row("HQ Address", mfr_info.get("address"), alt=True)
+        country = mfr_info.get("country")
+        if country:
+            kv_row("Country", country, alt=False)
+        info_text = clean_html(mfr_info.get("info"))
+        if info_text:
+            pdf.ln(2)
+            desc_row(info_text)
+
     # ═══════════════════════════════════════════════════════
     # 2 - MILEAGE HISTORY
     # ═══════════════════════════════════════════════════════
-    section_header("Mileage History")
+    section_header("Mileage / Odometer History")
     mileage = data.get("mileage", {})
     has_ml = False
     ml_fields = [
@@ -328,18 +383,18 @@ def generate_pdf_report(target_vin, data):
     # ═══════════════════════════════════════════════════════
     # 3 - TITLE & OWNERSHIP HISTORY
     # ═══════════════════════════════════════════════════════
-    section_header("Title & Ownership History")
+    section_header("Title Records & Ownership History")
     title_data  = data.get("title", {})
     ownerships  = title_data.get("ownerships", [])
     owner_count = title_data.get("itemsCount", len(ownerships))
 
     if ownerships:
         tc(*C_MED_BLUE); pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(EW, 6, "  " + str(owner_count) + " Owner(s) on Record",
+        pdf.cell(EW, 6, "  " + str(owner_count) + " Owner(s) on Record (Registration Data)",
                  new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2); tc(*C_TEXT_DARK)
         for i, o in enumerate(ownerships):
-            mini_header("Owner #" + str(i + 1))
+            mini_header("Owner Record #" + str(i + 1))
             period = o.get("ownershipPeriod", {}) or {}
             yrs = period.get("years", 0) or 0
             mos = period.get("months", 0) or 0
@@ -358,25 +413,57 @@ def generate_pdf_report(target_vin, data):
                 kv_row(lbl, val, alt=(j % 2 == 1))
             pdf.ln(2)
     else:
-        no_data("No title/ownership records available.")
+        no_data("No registration title records available.")
+
+    # Render section_title_ownership_history if available
+    timeline_data = data.get("title_ownership_history", {})
+    owners_timeline = timeline_data.get("ownershipTimeline", [])
+    total_owners = timeline_data.get("totalOwnersCount")
+    state_count = timeline_data.get("stateRegisteredCount")
+    avg_own = timeline_data.get("averageOwnership")
+
+    if total_owners or state_count or avg_own or owners_timeline:
+        mini_header("Ownership Timeline Summary")
+        if total_owners:
+            kv_row("Total Owners on Record", str(total_owners), alt=False)
+        if state_count:
+            kv_row("States Registered In", str(state_count), alt=True)
+        if avg_own:
+            kv_row("Average Ownership Duration", str(avg_own), alt=False)
+
+        if owners_timeline:
+            pdf.ln(2)
+            thead = ["Period", "State Registered", "Ownership Duration"]
+            tbody = []
+            for rec in owners_timeline:
+                tbody.append([
+                    rec.get("period", "N/A"),
+                    rec.get("state", "N/A"),
+                    rec.get("length", "N/A")
+                ])
+            draw_table_data(thead, tbody, [50, 60, 70])
 
     # ═══════════════════════════════════════════════════════
     # 4 - ACCIDENT & DAMAGE HISTORY
     # ═══════════════════════════════════════════════════════
-    section_header("Accident & Damage History")
+    section_header("Accidents & Damage History")
     rows_v   = data.get("accidents_v", {}).get("rows", [])
     rows_a   = data.get("accidents_a", {}).get("rows", [])
+    rows_main = data.get("accidents", {}).get("rows", [])
     acc_null = data.get("accidents_null", {})
 
-    if not rows_v and not rows_a:
+    # Combine all accident rows
+    combined_rows_a = list(rows_a) + list(rows_main)
+
+    if not rows_v and not combined_rows_a:
         msg = acc_null.get("noHitMessage", "No accident records found.")
         ok_row("No Accidents Reported")
         if msg:
             desc_row(msg)
     else:
-        if rows_a:
-            mini_header("AAMVA Records  (" + str(len(rows_a)) + " record(s))")
-            for row in rows_a:
+        if combined_rows_a:
+            mini_header("Accident / Damage Records (" + str(len(combined_rows_a)) + " record(s))")
+            for row in combined_rows_a:
                 parts = [row.get("date", ""), row.get("state", ""), row.get("title", "")]
                 hdr = "  |  ".join(p for p in parts if p)
                 warn_row(hdr)
@@ -385,7 +472,7 @@ def generate_pdf_report(target_vin, data):
 
         if rows_v:
             damage_cls = data.get("accidents_v", {}).get("damageClasses", "")
-            mini_header("Detailed Accident Records  (" + str(len(rows_v)) + " record(s))")
+            mini_header("Detailed Wreck / Damage Classification (" + str(len(rows_v)) + " record(s))")
             if damage_cls:
                 kv_row("Damage Classification", str(damage_cls))
             for row in rows_v:
@@ -421,7 +508,7 @@ def generate_pdf_report(target_vin, data):
     # ═══════════════════════════════════════════════════════
     # 6 - INSURANCE LOSS RECORDS
     # ═══════════════════════════════════════════════════════
-    section_header("Insurance Loss Records")
+    section_header("Total Loss / Insurer Records")
     loss_records = data.get("loss", {}).get("insurersRecords", [])
     if loss_records:
         for i, rec in enumerate(loss_records):
@@ -431,13 +518,13 @@ def generate_pdf_report(target_vin, data):
                 kv_row(k.replace(" =>", "").strip(), v, alt=alt_r); alt_r = not alt_r
             pdf.ln(2)
     else:
-        ok_row("No Insurance Loss Records Found")
+        ok_row("No Insurance Total Loss Records Found")
     pdf.ln(2)
 
     # ═══════════════════════════════════════════════════════
     # 7 - TITLE PROBLEM CHECK
     # ═══════════════════════════════════════════════════════
-    section_header("Title Problem Check")
+    section_header("Problem Checks (Title Brands)")
     problem_rows = data.get("title_issues", {}).get("problemCheckRows", [])
     if problem_rows:
         for i, row in enumerate(problem_rows):
@@ -453,7 +540,7 @@ def generate_pdf_report(target_vin, data):
             if desc:
                 desc_row(desc)
     else:
-        ok_row("No Title Issues Found")
+        ok_row("No Title Brand Brand Problems Found")
     pdf.ln(2)
 
     # ═══════════════════════════════════════════════════════
@@ -588,7 +675,28 @@ def generate_pdf_report(target_vin, data):
         no_data("No crash test data available.")
 
     # ═══════════════════════════════════════════════════════
-    # 13 - MAINTENANCE SCHEDULE
+    # 13 - AWARDS & ACCOLADES
+    # ═══════════════════════════════════════════════════════
+    section_header("Awards & Accolades")
+    awards_data = data.get("awards", {})
+    awards_recs = awards_data.get("awardsAndAccoladesRecords", {})
+    if awards_recs:
+        for award_name, award_info in awards_recs.items():
+            mini_header(award_name)
+            source = award_info.get("Source", "N/A")
+            website = award_info.get("Website", "N/A")
+            snippet = clean_html(award_info.get("Snippet", ""))
+            kv_row("Source", source, alt=False)
+            if website and website != "N/A":
+                kv_row("Website", clean_html(website), alt=True)
+            if snippet and snippet != "N/A":
+                desc_row(snippet)
+            pdf.ln(1)
+    else:
+        no_data("No awards or accolades found for this vehicle.")
+
+    # ═══════════════════════════════════════════════════════
+    # 14 - RECOMMENDED MAINTENANCE SCHEDULE
     # ═══════════════════════════════════════════════════════
     section_header("Recommended Maintenance Schedule")
     maint_recs = data.get("maintenance", {}).get("maintenanceRecords", [])
@@ -611,7 +719,7 @@ def generate_pdf_report(target_vin, data):
         no_data("No maintenance schedule data available.")
 
     # ═══════════════════════════════════════════════════════
-    # 14 - SAFETY EQUIPMENT
+    # 15 - SAFETY EQUIPMENT
     # ═══════════════════════════════════════════════════════
     section_header("Safety Equipment")
     safety_eq = data.get("safety_equipment", {})
@@ -626,6 +734,55 @@ def generate_pdf_report(target_vin, data):
             pdf.ln(1)
     else:
         no_data("No safety equipment data available.")
+
+    # ═══════════════════════════════════════════════════════
+    # 16 - WARRANTIES
+    # ═══════════════════════════════════════════════════════
+    section_header("Warranties")
+    warr_data = data.get("warranties", {})
+    warr_table = warr_data.get("warrantiesTable", {})
+    warr_thead = warr_table.get("thead", [])
+    warr_tbody = warr_table.get("tbody", [])
+    if warr_thead and warr_tbody:
+        draw_table_data(warr_thead, warr_tbody, [60, 40, 40, 40])
+    else:
+        no_data("No warranties information available.")
+
+    # ═══════════════════════════════════════════════════════
+    # 17 - COST OF OWNERSHIP
+    # ═══════════════════════════════════════════════════════
+    section_header("Cost of Ownership")
+    cost_data = data.get("cost_ownership", {})
+    cost_state = cost_data.get("costState")
+    cost_table = cost_data.get("costTable", {})
+    cost_thead = cost_table.get("thead", [])
+    cost_tbody = cost_table.get("tbody", [])
+    if cost_state:
+        kv_row("Cost Estimate State", cost_state)
+        pdf.ln(2)
+    if cost_thead and cost_tbody:
+        draw_table_data(cost_thead, cost_tbody, [40, 23, 23, 23, 23, 23, 25])
+    else:
+        no_data("No cost of ownership information available.")
+
+    # ═══════════════════════════════════════════════════════
+    # 18 - LOCATION HISTORY
+    # ═══════════════════════════════════════════════════════
+    section_header("Location History")
+    loc_data = data.get("location", {})
+    loc_table = loc_data.get("locationHistoryTable", {})
+    loc_tbody = loc_table.get("tbody", [])
+    if loc_tbody:
+        for idx, row in enumerate(loc_tbody):
+            state = row[0] if len(row) > 0 else "N/A"
+            date = row[1] if len(row) > 1 else "N/A"
+            notice = clean_html(row[2]) if len(row) > 2 else ""
+            warn_row(f"{state}  |  Date: {date}")
+            if notice:
+                desc_row(notice)
+            pdf.ln(1)
+    else:
+        no_data("No location history available.")
 
     # ── NMVTIS DISCLAIMER ────────────────────────────────────
     pdf.ln(6)
@@ -642,7 +799,6 @@ def generate_pdf_report(target_vin, data):
     ))
 
     return pdf.output()
-
 
 # ─────────────────────────────────────────────────────────────
 # EMAIL DELIVERY
@@ -675,7 +831,8 @@ def send_vin_report(target_vin, customer_email, data):
     )
 
     acc_count = len(data.get("accidents_v", {}).get("rows", [])) + \
-                len(data.get("accidents_a", {}).get("rows", []))
+                len(data.get("accidents_a", {}).get("rows", [])) + \
+                len(data.get("accidents", {}).get("rows", []))
     acc_badge = (
         '<span style="color:#c0392b;font-weight:bold;">' + str(acc_count) + ' Accident Record(s)</span>'
         if acc_count else
@@ -799,7 +956,6 @@ def send_vin_report(target_vin, customer_email, data):
     server.sendmail(SMTP_EMAIL, customer_email, msg.as_string())
     server.quit()
 
-
 # ─────────────────────────────────────────────────────────────
 # ROUTES
 # ─────────────────────────────────────────────────────────────
@@ -867,7 +1023,6 @@ def handle_etsy_order():
         return jsonify({"status": "failed",
                         "error": "Email sending failed: " + str(e)}), 500
 
-
 @app.route('/test-report', methods=['GET', 'POST'])
 def test_report():
     if request.method == 'POST':
@@ -889,12 +1044,18 @@ def test_report():
     try:
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
-        raw_json = car_response.json()
-        return jsonify({"status": "success", "content": raw_json.get("content", {})}), 200
+        data = extract_all_data(car_response.json())
     except Exception as e:
-        return jsonify({"status": "failed", "error": str(e)}), 500
+        return jsonify({"status": "failed",
+                        "error": "GoodCar API call failed: " + str(e)}), 500
 
+    try:
+        send_vin_report(target_vin, customer_email, data)
+        return jsonify({"status": "success",
+                        "message": "Test report for VIN " + target_vin + " sent to " + customer_email}), 200
+    except Exception as e:
+        return jsonify({"status": "failed",
+                        "error": "Email sending failed: " + str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
