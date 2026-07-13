@@ -5,6 +5,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 
 app = Flask(__name__)
 
@@ -61,29 +62,190 @@ def handle_etsy_order():
     car_data = car_response.json()
     specs = car_data.get("specifications", {})
 
-    # HTML Generation Layout (Meets GoodCar branding mandates)[cite: 1]
+    # Determine if logo.png exists for branding
+    logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
+    has_logo = os.path.exists(logo_path)
+    
+    if has_logo:
+        # Use inline Content-ID reference for the logo
+        logo_html = '<img src="cid:logo" alt="VINreport Logo" style="height: 60px; max-width: 250px; object-fit: contain;">'
+    else:
+        # Styled text logo fallback
+        logo_html = '<h1 style="margin: 0; font-family: Arial, sans-serif; font-size: 28px; color: #0d2c54;">VIN<span style="color: #d81e1e;">report</span></h1>'
+
+    # HTML Generation Layout (Meets GoodCar branding mandates and visual standards)
     html_report = f"""
+    <!DOCTYPE html>
     <html>
-    <body style="font-family: Arial; padding: 20px;">
-        <div style="display: flex; justify-content: space-between;">
-            <h1>VINreport</h1>
-            <p>Powered by GoodCar</p> <!-- MANDATORY BADGE -->
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                background-color: #f4f6f9;
+                margin: 0;
+                padding: 0;
+                color: #333333;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 20px auto;
+                background-color: #ffffff;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+                border: 1px solid #e1e8ed;
+            }}
+            .header {{
+                padding: 30px;
+                border-bottom: 1px solid #f0f3f6;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }}
+            .badge-container {{
+                text-align: right;
+            }}
+            .badge {{
+                font-size: 11px;
+                color: #7a8b9a;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin: 0;
+                font-weight: bold;
+            }}
+            .content {{
+                padding: 30px;
+            }}
+            .hero {{
+                background: linear-gradient(135deg, #0d2c54 0%, #1b497e 100%);
+                color: #ffffff;
+                padding: 30px;
+                border-radius: 6px;
+                margin-bottom: 30px;
+                text-align: center;
+            }}
+            .hero h2 {{
+                margin: 0 0 10px 0;
+                font-size: 24px;
+                font-weight: 600;
+            }}
+            .hero p {{
+                margin: 0;
+                font-size: 14px;
+                color: #b0c4de;
+                letter-spacing: 0.5px;
+            }}
+            .section-title {{
+                font-size: 16px;
+                font-weight: bold;
+                color: #0d2c54;
+                margin-top: 0;
+                margin-bottom: 15px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border-bottom: 2px solid #f0f3f6;
+                padding-bottom: 8px;
+            }}
+            .specs-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 30px;
+            }}
+            .specs-table td {{
+                padding: 12px 10px;
+                border-bottom: 1px solid #f0f3f6;
+                font-size: 14px;
+            }}
+            .specs-label {{
+                font-weight: 600;
+                color: #5a6e85;
+                width: 35%;
+            }}
+            .specs-value {{
+                color: #2c3e50;
+            }}
+            .footer {{
+                background-color: #f8fafc;
+                padding: 20px 30px;
+                border-top: 1px solid #f0f3f6;
+                font-size: 11px;
+                color: #7f8c8d;
+                line-height: 1.6;
+            }}
+            .disclaimer-title {{
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #555;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div style="display: inline-block; vertical-align: middle;">
+                    {logo_html}
+                </div>
+                <div class="badge-container" style="display: inline-block; vertical-align: middle; float: right; margin-top: 15px;">
+                    <p class="badge">Powered by GoodCar</p>
+                </div>
+            </div>
+            <div class="content">
+                <div class="hero">
+                    <h2>Vehicle History Report</h2>
+                    <p>VIN: <strong style="color: #ffffff;">{target_vin}</strong></p>
+                </div>
+                
+                <h3 class="section-title">Specifications</h3>
+                <table class="specs-table">
+                    <tr>
+                        <td class="specs-label">Year</td>
+                        <td class="specs-value">{specs.get('year', 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td class="specs-label">Make</td>
+                        <td class="specs-value">{specs.get('make', 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td class="specs-label">Model</td>
+                        <td class="specs-value">{specs.get('model', 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td class="specs-label">Engine Type</td>
+                        <td class="specs-value">{specs.get('engine_type', 'N/A')}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="footer">
+                <div class="disclaimer-title">NMVTIS Disclaimer</div>
+                <p style="margin: 0;">The National Motor Vehicle Title Information System (NMVTIS) is an electronic system that contains information on certain automobiles titled in the United States. NMVTIS is intended to serve as a reliable source of title and brand history, but it does not contain detailed information regarding a vehicle's repair history.</p>
+            </div>
         </div>
-        <hr>
-        <h3>Vehicle: {specs.get('year')} {specs.get('make')} {specs.get('model')}</h3>
-        <p>Engine: {specs.get('engine_type')}</p>
-        <hr>
-        <p style="font-size: 8px; color: gray;">NMVTIS Disclaimer: [Insert Text]</p> <!-- MANDATORY FOOTER -->
     </body>
     </html>
     """
 
-    # Deliver Email
-    msg = MIMEMultipart()
+    # Deliver Email (Construct related multipart for inline image support)
+    msg = MIMEMultipart('related')
     msg['From'] = SMTP_EMAIL
     msg['To'] = customer_email
     msg['Subject'] = f"Your VINreport for VIN: {target_vin}"
-    msg.attach(MIMEText(html_report, 'html'))
+
+    # Create the HTML alternative part
+    msg_alternative = MIMEMultipart('alternative')
+    msg.attach(msg_alternative)
+    msg_alternative.attach(MIMEText(html_report, 'html'))
+
+    # If logo.png exists, attach it as inline content
+    if has_logo:
+        try:
+            with open(logo_path, 'rb') as f:
+                msg_image = MIMEImage(f.read())
+            msg_image.add_header('Content-ID', '<logo>')
+            msg_image.add_header('Content-Disposition', 'inline', filename='logo.png')
+            msg.attach(msg_image)
+        except Exception as img_err:
+            app.logger.error(f"Failed to attach inline logo: {img_err}")
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
