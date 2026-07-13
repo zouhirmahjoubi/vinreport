@@ -889,18 +889,11 @@ def test_report():
     try:
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
-        data = extract_all_data(car_response.json())
+        raw_json = car_response.json()
+        content_keys = list(raw_json.get("content", {}).keys())
+        return jsonify({"status": "success", "keys": content_keys}), 200
     except Exception as e:
-        return jsonify({"status": "failed",
-                        "error": "GoodCar API call failed: " + str(e)}), 500
-
-    try:
-        send_vin_report(target_vin, customer_email, data)
-        return jsonify({"status": "success",
-                        "message": "Test report for VIN " + target_vin + " sent to " + customer_email}), 200
-    except Exception as e:
-        return jsonify({"status": "failed",
-                        "error": "Email sending failed: " + str(e)}), 500
+        return jsonify({"status": "failed", "error": str(e)}), 500
 
 
 if __name__ == '__main__':
