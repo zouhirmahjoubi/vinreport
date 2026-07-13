@@ -406,20 +406,14 @@ def test_report():
     goodcar_url = 'https://goodcar.com/business/api/vin-report-comprehensive'
     goodcar_headers = {'Authorization': f'Bearer {GOODCAR_API_KEY}'}
     goodcar_payload = {'vin': target_vin}
-    
+
     try:
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
         car_data = car_response.json()
-        specs = car_data.get("specifications", {})
+        return jsonify({"status": "success", "raw_car_data": car_data}), 200
     except Exception as e:
         return jsonify({"status": "failed", "error": f"GoodCar API call failed: {str(e)}"}), 500
-
-    try:
-        send_vin_report(target_vin, customer_email, specs)
-        return jsonify({"status": "success", "message": f"Test report for VIN {target_vin} sent to {customer_email}"}), 200
-    except Exception as e:
-        return jsonify({"status": "failed", "error": f"Email sending failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Fallback default port for local testing
