@@ -54,14 +54,14 @@ def _safe_dict(val):
 
 def extract_all_data(car_data):
     """Extract all 15+ sections from the GoodCar API response."""
-    content       = car_data.get("content", {})
-    main_info     = content.get("main", {})
-    raw_vehicle   = main_info.get("vehicleDataRaw", {})
-    sec_specs     = content.get("section_specs", {})
-    vds           = sec_specs.get("vehicleDataSpecs", {})
-    engine_info   = sec_specs.get("engine", {})
-    trans_info    = sec_specs.get("transmission", {})
-    epa_mpg       = sec_specs.get("epaMpg", {})
+    content       = _safe_dict(car_data.get("content", {}))
+    main_info     = _safe_dict(content.get("main", {}))
+    raw_vehicle   = _safe_dict(main_info.get("vehicleDataRaw", {}))
+    sec_specs     = _safe_dict(content.get("section_specs", {}))
+    vds           = _safe_dict(sec_specs.get("vehicleDataSpecs", {}))
+    engine_info   = _safe_dict(sec_specs.get("engine", {}))
+    trans_info    = _safe_dict(sec_specs.get("transmission", {}))
+    epa_mpg       = _safe_dict(sec_specs.get("epaMpg", {}))
 
     year  = raw_vehicle.get("year")  or vds.get("year",  {}).get("txt", "N/A")
     make  = raw_vehicle.get("make")  or "N/A"
@@ -85,31 +85,31 @@ def extract_all_data(car_data):
         "engine":             engine_info,
         "transmission":       trans_info,
         "epa_mpg":            epa_mpg,
-        "standard_specs":     sec_specs.get("standardSpecifications", {}),
-        "safety_equipment":   sec_specs.get("safetyEquipment", {}),
+        "standard_specs":     _safe_dict(sec_specs.get("standardSpecifications", {})),
+        "safety_equipment":   _safe_dict(sec_specs.get("safetyEquipment", {})),
         # History sections
-        "mileage":           content.get("section_mileage", {}),
-        "title":             content.get("section_title", {}),
-        "accidents_v":       content.get(acc_key_v, {}),
-        "accidents_a":       content.get(acc_key_a, {}),
-        "accidents_null":    content.get(acc_key_null, {}),
-        "accidents":         content.get("section_accidents", {}),
-        "junk":              content.get("section_junk", {}),
-        "loss":              content.get("section_loss", {}),
-        "title_issues":      content.get("section_title_issues", {}),
-        "market_values":     content.get("section_market_values", {}),
-        "sales":             content.get("section_sales", {}),
-        "recalls":           content.get("section_recalls", {}),
-        "safety_complaints": content.get("section_safety_complaints", {}),
-        "maintenance":       content.get("section_maintenance_schedule", {}),
-        "crash_test":        content.get("section_crash_test", {}),
-        "awards":            content.get("section_awards", {}),
+        "mileage":           _safe_dict(content.get("section_mileage", {})),
+        "title":             _safe_dict(content.get("section_title", {})),
+        "accidents_v":       _safe_dict(content.get(acc_key_v, {})),
+        "accidents_a":       _safe_dict(content.get(acc_key_a, {})),
+        "accidents_null":    _safe_dict(content.get(acc_key_null, {})),
+        "accidents":         _safe_dict(content.get("section_accidents", {})),
+        "junk":              _safe_dict(content.get("section_junk", {})),
+        "loss":              _safe_dict(content.get("section_loss", {})),
+        "title_issues":      _safe_dict(content.get("section_title_issues", {})),
+        "market_values":     _safe_dict(content.get("section_market_values", {})),
+        "sales":             _safe_dict(content.get("section_sales", {})),
+        "recalls":           _safe_dict(content.get("section_recalls", {})),
+        "safety_complaints": _safe_dict(content.get("section_safety_complaints", {})),
+        "maintenance":       _safe_dict(content.get("section_maintenance_schedule", {})),
+        "crash_test":        _safe_dict(content.get("section_crash_test", {})),
+        "awards":            _safe_dict(content.get("section_awards", {})),
         # Newly discovered sections
-        "warranties":              content.get("section_warranties", {}),
-        "cost_ownership":          content.get("section_cost_ownership", {}),
-        "location":                content.get("section_location", {}),
-        "mfr":                     content.get("section_mfr", {}),
-        "title_ownership_history": content.get("section_title_ownership_history", {}),
+        "warranties":              _safe_dict(content.get("section_warranties", {})),
+        "cost_ownership":          _safe_dict(content.get("section_cost_ownership", {})),
+        "location":                _safe_dict(content.get("section_location", {})),
+        "mfr":                     _safe_dict(content.get("section_mfr", {})),
+        "title_ownership_history": _safe_dict(content.get("section_title_ownership_history", {})),
     }
 
 # Backward-compatibility alias
@@ -1590,7 +1590,7 @@ class PremiumVINReport(FPDF):
     def draw_crash_test_page(self):
         self.draw_page_title("Crash Test Safety Ratings", f"NHTSA star safety index scores for VIN: {self.target_vin}")
         
-        crash_data = self.data.get("crash_test", {}).get("crashTest", {})
+        crash_data = _safe_dict(_safe_dict(self.data.get("crash_test", {})).get("crashTest", {}))
         
         self.draw_card(15, 38, 180, 26, bg_color=self.c_navy, shadow=True)
         self.set_xy(25, 42)
@@ -1898,8 +1898,8 @@ class PremiumVINReport(FPDF):
         
         headers = ["Coverage Program", "Start Date", "End Date", "Mile Limit", "Coverage Status"]
         
-        warr_data = self.data.get("warranties", {})
-        warr_table = warr_data.get("warrantiesTable", {})
+        warr_data = _safe_dict(self.data.get("warranties", {}))
+        warr_table = _safe_dict(warr_data.get("warrantiesTable", {}))
         rows = warr_table.get("tbody", [])
         
         if not rows:
@@ -1926,8 +1926,8 @@ class PremiumVINReport(FPDF):
         
         headers = ["Expense Category", "Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Total Sum"]
         
-        cost_data = self.data.get("cost_ownership", {})
-        cost_table = cost_data.get("costTable", {})
+        cost_data = _safe_dict(self.data.get("cost_ownership", {}))
+        cost_table = _safe_dict(cost_data.get("costTable", {}))
         rows = cost_table.get("tbody", [])
         
         if not rows:
@@ -1978,8 +1978,8 @@ class PremiumVINReport(FPDF):
         
         headers = ["State Code", "Date Range", "Registration Type", "Odometer Checked", "Details"]
         
-        loc_data = self.data.get("location", {})
-        loc_table = loc_data.get("locationHistoryTable", {})
+        loc_data = _safe_dict(self.data.get("location", {}))
+        loc_table = _safe_dict(loc_data.get("locationHistoryTable", {}))
         loc_tbody = loc_table.get("tbody", [])
         
         rows = []
