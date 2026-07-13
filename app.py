@@ -924,13 +924,19 @@ def send_vin_report(target_vin, customer_email, data):
     </html>
     """
 
-    msg = MIMEMultipart('related')
+    # Root message is mixed
+    msg = MIMEMultipart('mixed')
     msg['From']    = SMTP_EMAIL
     msg['To']      = customer_email
     msg['Subject'] = "Your VINreport for VIN: " + target_vin
 
+    # Related part for HTML and inline images
+    msg_related = MIMEMultipart('related')
+    msg.attach(msg_related)
+
+    # Alternative part for HTML
     msg_alternative = MIMEMultipart('alternative')
-    msg.attach(msg_alternative)
+    msg_related.attach(msg_alternative)
     msg_alternative.attach(MIMEText(html_report, 'html'))
 
     if has_logo:
@@ -939,7 +945,7 @@ def send_vin_report(target_vin, customer_email, data):
                 msg_image = MIMEImage(f.read())
             msg_image.add_header('Content-ID', '<logo>')
             msg_image.add_header('Content-Disposition', 'inline', filename='logo.png')
-            msg.attach(msg_image)
+            msg_related.attach(msg_image)
         except Exception as img_err:
             print("Failed to attach inline logo: " + str(img_err))
 
@@ -949,7 +955,7 @@ def send_vin_report(target_vin, customer_email, data):
         part.set_payload(bytes(pdf_bytes))
         encoders.encode_base64(part)
         part.add_header('Content-Disposition',
-                        'attachment; filename="VINreport_' + target_vin + '.pdf"')
+                        'attachment', filename='VINreport_' + target_vin + '.pdf')
         msg.attach(part)
     except Exception as pdf_err:
         raise Exception("PDF attachment failed: " + str(pdf_err))
