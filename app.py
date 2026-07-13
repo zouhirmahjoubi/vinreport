@@ -890,15 +890,7 @@ def test_report():
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
         car_response.raise_for_status()
         raw_json = car_response.json()
-        content = raw_json.get("content", {})
-        debug_data = {
-            "warranties": content.get("section_warranties"),
-            "cost_ownership": content.get("section_cost_ownership"),
-            "location": content.get("section_location"),
-            "mfr": content.get("section_mfr"),
-            "accidents": content.get("section_accidents")
-        }
-        return jsonify({"status": "success", "debug_data": debug_data}), 200
+        return jsonify({"status": "success", "content": raw_json.get("content", {})}), 200
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
 
