@@ -952,7 +952,7 @@ def send_vin_report(target_vin, customer_email, data):
                         'attachment; filename="VINreport_' + target_vin + '.pdf"')
         msg.attach(part)
     except Exception as pdf_err:
-        print("Failed to generate or attach PDF: " + str(pdf_err))
+        raise Exception("PDF attachment failed: " + str(pdf_err))
 
     if SMTP_USE_SSL:
         server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
