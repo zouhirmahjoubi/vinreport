@@ -19,52 +19,7 @@ SMTP_HOST = os.environ.get("SMTP_HOST", "mail.spacemail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
 
-@app.route('/etsy-webhook', methods=['POST'])
-def handle_etsy_order():
-    webhook_data = request.json
-    
-    if not webhook_data or webhook_data.get("event_type") != "order.paid":
-        return jsonify({"status": "ignored"}), 200
-
-    resource_url = webhook_data.get("resource_url")
-    
-    # Query Etsy for the actual receipt data
-    etsy_headers = {
-        "x-api-key": ETSY_API_KEY,
-        "Authorization": f"Bearer {ETSY_OAUTH_TOKEN}"
-    }
-    receipt_response = requests.get(resource_url, headers=etsy_headers)
-    receipt_details = receipt_response.json()
-    
-    # Extract personalization
-    personalization_text = ""
-    for transaction in receipt_details.get("transactions", []):
-        for prop in transaction.get("property_values", []):
-            if prop.get("property_name") == "Personalization":
-                personalization_text = prop.get("values", [""])[0]
-
-    if not personalization_text:
-        return jsonify({"status": "error", "message": "No personalization details found"}), 400
-
-    # Match VIN & Email
-    vin_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', personalization_text.upper())
-    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', personalization_text)
-    
-    if not vin_match or not email_match:
-        return jsonify({"status": "error", "message": "Failed to parse"}), 400
-        
-    target_vin = vin_match.group(1)
-    customer_email = email_match.group(0)
-
-    # GoodCar API Call
-    goodcar_url = 'https://goodcar.com/business/api/vin-report-comprehensive'
-    goodcar_headers = {'Authorization': f'Bearer {GOODCAR_API_KEY}'}
-    goodcar_payload = {'vin': target_vin}
-    
-    car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
-    car_data = car_response.json()
-    specs = car_data.get("specifications", {})
-
+def send_vin_report(target_vin, customer_email, specs):
     # Determine if logo.png exists for branding
     logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
     has_logo = os.path.exists(logo_path)
@@ -248,20 +203,102 @@ def handle_etsy_order():
             msg_image.add_header('Content-Disposition', 'inline', filename='logo.png')
             msg.attach(msg_image)
         except Exception as img_err:
-            app.logger.error(f"Failed to attach inline logo: {img_err}")
+            print(f"Failed to attach inline logo: {img_err}")
+
+    if SMTP_USE_SSL:
+        server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+    else:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server.starttls()
+    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+    server.sendmail(SMTP_EMAIL, customer_email, msg.as_string())
+    server.quit()
+
+@app.route('/etsy-webhook', methods=['POST'])
+def handle_etsy_order():
+    webhook_data = request.json
+    
+    if not webhook_data or webhook_data.get("event_type") != "order.paid":
+        return jsonify({"status": "ignored"}), 200
+
+    resource_url = webhook_data.get("resource_url")
+    
+    # Query Etsy for the actual receipt data
+    etsy_headers = {
+        "x-api-key": ETSY_API_KEY,
+        "Authorization": f"Bearer {ETSY_OAUTH_TOKEN}"
+    }
+    receipt_response = requests.get(resource_url, headers=etsy_headers)
+    receipt_details = receipt_response.json()
+    
+    # Extract personalization
+    personalization_text = ""
+    for transaction in receipt_details.get("transactions", []):
+        for prop in transaction.get("property_values", []):
+            if prop.get("property_name") == "Personalization":
+                personalization_text = prop.get("values", [""])[0]
+
+    if not personalization_text:
+        return jsonify({"status": "error", "message": "No personalization details found"}), 400
+
+    # Match VIN & Email
+    vin_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', personalization_text.upper())
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', personalization_text)
+    
+    if not vin_match or not email_match:
+        return jsonify({"status": "error", "message": "Failed to parse"}), 400
+        
+    target_vin = vin_match.group(1)
+    customer_email = email_match.group(0)
+
+    # GoodCar API Call
+    goodcar_url = 'https://goodcar.com/business/api/vin-report-comprehensive'
+    goodcar_headers = {'Authorization': f'Bearer {GOODCAR_API_KEY}'}
+    goodcar_payload = {'vin': target_vin}
+    
+    try:
+        car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+        car_data = car_response.json()
+        specs = car_data.get("specifications", {})
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"GoodCar API call failed: {str(e)}"}), 500
 
     try:
-        if SMTP_USE_SSL:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
-        else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
-            server.starttls()
-        server.login(SMTP_EMAIL, SMTP_PASSWORD)
-        server.sendmail(SMTP_EMAIL, customer_email, msg.as_string())
-        server.quit()
+        send_vin_report(target_vin, customer_email, specs)
         return jsonify({"status": "success"}), 200
     except Exception as e:
-        return jsonify({"status": "failed", "error": str(e)}), 500
+        return jsonify({"status": "failed", "error": f"Email sending failed: {str(e)}"}), 500
+
+@app.route('/test-report', methods=['GET', 'POST'])
+def test_report():
+    if request.method == 'POST':
+        data = request.json or {}
+        target_vin = data.get('vin')
+        customer_email = data.get('email')
+    else:
+        target_vin = request.args.get('vin')
+        customer_email = request.args.get('email')
+
+    if not target_vin or not customer_email:
+        return jsonify({"status": "error", "message": "Missing 'vin' or 'email' parameters"}), 400
+
+    # GoodCar API Call
+    goodcar_url = 'https://goodcar.com/business/api/vin-report-comprehensive'
+    goodcar_headers = {'Authorization': f'Bearer {GOODCAR_API_KEY}'}
+    goodcar_payload = {'vin': target_vin}
+    
+    try:
+        car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+        car_data = car_response.json()
+        specs = car_data.get("specifications", {})
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"GoodCar API call failed: {str(e)}"}), 500
+
+    try:
+        send_vin_report(target_vin, customer_email, specs)
+        return jsonify({"status": "success", "message": f"Test report for VIN {target_vin} sent to {customer_email}"}), 200
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"Email sending failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Fallback default port for local testing
