@@ -6,6 +6,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
+from fpdf import FPDF
 
 app = Flask(__name__)
 
@@ -18,6 +21,97 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_HOST = os.environ.get("SMTP_HOST", "mail.spacemail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
+
+def generate_pdf_report(target_vin, specs):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(15, 15, 15)
+    
+    # Logo or Brand name
+    logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
+    has_logo = os.path.exists(logo_path)
+    
+    if has_logo:
+        try:
+            pdf.image(logo_path, x=15, y=15, h=12)
+            pdf.ln(15)
+        except Exception:
+            # Fallback text if logo fails to render
+            pdf.set_font("Helvetica", "B", 20)
+            pdf.set_text_color(13, 44, 84) # Dark Blue
+            pdf.cell(14, 10, "VIN", ln=False)
+            pdf.set_text_color(216, 30, 30) # Red
+            pdf.cell(30, 10, "report", ln=True)
+            pdf.ln(5)
+    else:
+        pdf.set_font("Helvetica", "B", 20)
+        pdf.set_text_color(13, 44, 84) # Dark Blue
+        pdf.cell(14, 10, "VIN", ln=False)
+        pdf.set_text_color(216, 30, 30) # Red
+        pdf.cell(30, 10, "report", ln=True)
+        pdf.ln(5)
+
+    # Powered by GoodCar
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(122, 139, 154)
+    pdf.cell(0, 5, "POWERED BY GOODCAR", ln=True, align="R")
+    
+    # Divider line
+    pdf.set_draw_color(240, 243, 246)
+    pdf.set_line_width(0.5)
+    pdf.line(15, pdf.get_y(), 195, pdf.get_y())
+    pdf.ln(8)
+    
+    # Hero box
+    pdf.set_fill_color(13, 44, 84) # #0d2c54
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 12, "  Vehicle History Report", ln=True, fill=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(176, 196, 222)
+    pdf.cell(0, 8, f"  VIN: {target_vin}", ln=True, fill=True)
+    pdf.ln(10)
+    
+    # Specs Section
+    pdf.set_text_color(13, 44, 84)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "SPECIFICATIONS", ln=True)
+    
+    pdf.set_draw_color(13, 44, 84)
+    pdf.set_line_width(1)
+    pdf.line(15, pdf.get_y(), 50, pdf.get_y())
+    pdf.ln(5)
+    
+    def draw_row(label, value):
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(90, 110, 133)
+        pdf.cell(60, 10, f" {label}", border="B")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(44, 62, 80)
+        pdf.cell(0, 10, f" {value}", border="B", ln=True)
+
+    draw_row("Year", str(specs.get('year', 'N/A')))
+    draw_row("Make", str(specs.get('make', 'N/A')))
+    draw_row("Model", str(specs.get('model', 'N/A')))
+    draw_row("Engine Type", str(specs.get('engine_type', 'N/A')))
+    pdf.ln(25)
+    
+    # Disclaimer
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_text_color(85, 85, 85)
+    pdf.cell(0, 5, "NMVTIS Disclaimer", ln=True)
+    
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(127, 140, 141)
+    disclaimer_text = (
+        "The National Motor Vehicle Title Information System (NMVTIS) is an electronic system that contains "
+        "information on certain automobiles titled in the United States. NMVTIS is intended to serve as a reliable "
+        "source of title and brand history, but it does not contain detailed information regarding a vehicle's "
+        "repair history."
+    )
+    pdf.multi_cell(0, 4, disclaimer_text)
+    
+    return pdf.output()
 
 def send_vin_report(target_vin, customer_email, specs):
     # Determine if logo.png exists for branding
@@ -204,6 +298,20 @@ def send_vin_report(target_vin, customer_email, specs):
             msg.attach(msg_image)
         except Exception as img_err:
             print(f"Failed to attach inline logo: {img_err}")
+
+    # Generate PDF report and attach it
+    try:
+        pdf_bytes = generate_pdf_report(target_vin, specs)
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(bytes(pdf_bytes))
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            f'attachment; filename="VINreport_{target_vin}.pdf"',
+        )
+        msg.attach(part)
+    except Exception as pdf_err:
+        print(f"Failed to generate or attach PDF: {pdf_err}")
 
     if SMTP_USE_SSL:
         server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
