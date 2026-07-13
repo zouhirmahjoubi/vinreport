@@ -203,16 +203,17 @@ def generate_pdf_report(target_vin, data):
     dc(*C_LIGHT_GRAY); pdf.set_line_width(0.5)
     pdf.line(15, pdf.get_y(), 195, pdf.get_y()); pdf.ln(6)
 
-    year  = data.get("year",  "N/A")
-    make  = data.get("make",  "N/A")
-    model = data.get("model", "N/A")
+    year  = str(data.get("year",  "N/A"))
+    make  = str(data.get("make",  "N/A"))
+    model = str(data.get("model", "N/A"))
+    target_vin_str = str(target_vin)
 
     fc(*C_DARK_BLUE); tc(*C_WHITE)
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(EW, 11, "  " + year + " " + make + " " + model,
+    pdf.cell(EW, 11, f"  {year} {make} {model}",
              new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
     pdf.set_font("Helvetica", "", 9); tc(176, 196, 222)
-    pdf.cell(EW, 7, "  Vehicle History Report  |  VIN: " + target_vin,
+    pdf.cell(EW, 7, f"  Vehicle History Report  |  VIN: {target_vin_str}",
              new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
     pdf.ln(6); tc(*C_TEXT_DARK)
 
@@ -388,7 +389,7 @@ def generate_pdf_report(target_vin, data):
             if damage_cls:
                 kv_row("Damage Classification", str(damage_cls))
             for row in rows_v:
-                warn_row("Accident  |  " + row.get("date", "") + "  |  State: " + row.get("state", ""))
+                warn_row(f"Accident  |  {row.get('date') or ''}  |  State: {row.get('state') or ''}")
                 tbl = row.get("table", {})
                 alt_r = False
                 for key in ["General Description", "Accident Type", "Nearest City",
@@ -656,14 +657,14 @@ def send_vin_report(target_vin, customer_email, data):
     else:
         logo_html = '<h1 style="margin:0;font-family:Arial,sans-serif;font-size:28px;color:#0d2c54;">VIN<span style="color:#d81e1e;">report</span></h1>'
 
-    year   = data.get("year",        "N/A")
-    make   = data.get("make",        "N/A")
-    model  = data.get("model",       "N/A")
-    engine = data.get("engine_type", "N/A")
+    year   = str(data.get("year",        "N/A"))
+    make   = str(data.get("make",        "N/A"))
+    model  = str(data.get("model",       "N/A"))
+    engine = str(data.get("engine_type", "N/A"))
 
     mileage    = data.get("mileage", {})
-    last_miles = mileage.get("lastReportedMileage", "N/A")
-    est_miles  = mileage.get("estimatedMileage",    "N/A")
+    last_miles = str(mileage.get("lastReportedMileage", "N/A"))
+    est_miles  = str(mileage.get("estimatedMileage",    "N/A"))
 
     recalls    = data.get("recalls", {})
     recall_cnt = recalls.get("itemsCount", 0) or 0
