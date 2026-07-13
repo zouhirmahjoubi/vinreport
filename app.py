@@ -15,6 +15,9 @@ ETSY_OAUTH_TOKEN = os.environ.get("ETSY_OAUTH_TOKEN")
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY")
 SMTP_EMAIL = os.environ.get("SMTP_EMAIL")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+SMTP_HOST = os.environ.get("SMTP_HOST", "mail.spacemail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
 
 @app.route('/etsy-webhook', methods=['POST'])
 def handle_etsy_order():
@@ -248,8 +251,11 @@ def handle_etsy_order():
             app.logger.error(f"Failed to attach inline logo: {img_err}")
 
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
+        if SMTP_USE_SSL:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+            server.starttls()
         server.login(SMTP_EMAIL, SMTP_PASSWORD)
         server.sendmail(SMTP_EMAIL, customer_email, msg.as_string())
         server.quit()
