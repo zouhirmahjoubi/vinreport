@@ -40,6 +40,13 @@ def clean_html(text):
     t = t.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&#39;", "'").replace("&quot;", '"').replace("&nbsp;", " ")
     return t.strip()
 
+def _safe_dict(val):
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, list) and len(val) > 0 and isinstance(val[0], dict):
+        return val[0]
+    return {}
+
 # ─────────────────────────────────────────────────────────────
 # DATA EXTRACTION  -  captures ALL GoodCar API sections
 # ─────────────────────────────────────────────────────────────
@@ -58,7 +65,7 @@ def extract_all_data(car_data):
     year  = raw_vehicle.get("year")  or vds.get("year",  {}).get("txt", "N/A")
     make  = raw_vehicle.get("make")  or "N/A"
     model = raw_vehicle.get("model") or "N/A"
-    engine_type = (engine_info.get("Brand Name =>") or
+    engine_type = (engine_info.get("Brand Name =>") or engine_info.get("Brand Name") or
                    vds.get("engine", {}).get("txt") or "N/A")
 
     # Build keys for accident sections (contain parentheses in key names)
@@ -263,11 +270,11 @@ def generate_pdf_report(target_vin, data):
     # ═══════════════════════════════════════════════════════
     section_header("Auto Specifications & Manufacturer")
 
-    vds  = data.get("vehicle_data_specs", {})
-    eng  = data.get("engine", {})
-    trns = data.get("transmission", {})
-    epa  = data.get("epa_mpg", {})
-    std  = data.get("standard_specs", {})
+    vds  = _safe_dict(data.get("vehicle_data_specs", {}))
+    eng  = _safe_dict(data.get("engine", {}))
+    trns = _safe_dict(data.get("transmission", {}))
+    epa  = _safe_dict(data.get("epa_mpg", {}))
+    std  = _safe_dict(data.get("standard_specs", {}))
 
     mini_header("General Info")
     gen_fields = [
@@ -286,43 +293,43 @@ def generate_pdf_report(target_vin, data):
 
     mini_header("Engine")
     eng_fields = [
-        ("Engine",         vds.get("engine", {}).get("txt") or eng.get("Brand Name =>")),
-        ("Engine Type",    eng.get("Engine type =>")),
-        ("Engine Code",    eng.get("Engine Code =>")),
-        ("Cylinders",      eng.get("Cylinders =>")),
-        ("Displacement",   eng.get("Displacement =>")),
-        ("Aspiration",     eng.get("Aspiration =>")),
-        ("Block Type",     eng.get("Block Type =>")),
-        ("Cam Type",       eng.get("Cam Type =>")),
-        ("Fuel Induction", eng.get("Fuel Induction =>")),
-        ("Valves",         eng.get("Valves =>")),
-        ("Max Horsepower", eng.get("Max HP =>")),
-        ("Max Torque",     eng.get("Max Torque =>")),
-        ("Redline",        eng.get("Redline =>")),
-        ("Oil Capacity",   eng.get("Oil Capacity =>")),
-        ("Compression",    eng.get("Compression =>")),
-        ("Bore",           eng.get("Bore =>")),
-        ("Stroke",         eng.get("Stroke =>")),
+        ("Engine",         vds.get("engine", {}).get("txt") or eng.get("Brand Name") or eng.get("Brand Name =>")),
+        ("Engine Type",    eng.get("Engine type") or eng.get("Engine type =>")),
+        ("Engine Code",    eng.get("Engine Code") or eng.get("Engine Code =>")),
+        ("Cylinders",      eng.get("Cylinders") or eng.get("Cylinders =>")),
+        ("Displacement",   eng.get("Displacement") or eng.get("Displacement =>")),
+        ("Aspiration",     eng.get("Aspiration") or eng.get("Aspiration =>")),
+        ("Block Type",     eng.get("Block Type") or eng.get("Block Type =>")),
+        ("Cam Type",       eng.get("Cam Type") or eng.get("Cam Type =>")),
+        ("Fuel Induction", eng.get("Fuel Induction") or eng.get("Fuel Induction =>")),
+        ("Valves",         eng.get("Valves") or eng.get("Valves =>")),
+        ("Max Horsepower", eng.get("Max HP") or eng.get("Max HP =>")),
+        ("Max Torque",     eng.get("Max Torque") or eng.get("Max Torque =>")),
+        ("Redline",        eng.get("Redline") or eng.get("Redline =>")),
+        ("Oil Capacity",   eng.get("Oil Capacity") or eng.get("Oil Capacity =>")),
+        ("Compression",    eng.get("Compression") or eng.get("Compression =>")),
+        ("Bore",           eng.get("Bore") or eng.get("Bore =>")),
+        ("Stroke",         eng.get("Stroke") or eng.get("Stroke =>")),
     ]
     for i, (lbl, val) in enumerate(eng_fields):
         kv_row(lbl, val, alt=(i % 2 == 1))
 
     mini_header("Transmission")
     trn_fields = [
-        ("Transmission", vds.get("transmissions", {}).get("txt") or trns.get("Brand Name =>")),
-        ("Type",         trns.get("Type =>")),
-        ("Detail Type",  trns.get("Detail Type =>")),
-        ("Gears",        trns.get("Gears =>")),
+        ("Transmission", vds.get("transmissions", {}).get("txt") or trns.get("Brand Name") or trns.get("Brand Name =>")),
+        ("Type",         trns.get("Type") or trns.get("Type =>")),
+        ("Detail Type",  trns.get("Detail Type") or trns.get("Detail Type =>")),
+        ("Gears",        trns.get("Gears") or trns.get("Gears =>")),
     ]
     for i, (lbl, val) in enumerate(trn_fields):
         kv_row(lbl, val, alt=(i % 2 == 1))
 
     mini_header("Fuel Economy (EPA Estimates)")
     epa_fields = [
-        ("City MPG",     epa.get("City =>")),
-        ("Highway MPG",  epa.get("Highway =>")),
-        ("Combined MPG", epa.get("Combined =>") or vds.get("mpg", {}).get("txt")),
-        ("Fuel Grade",   epa.get("Fuel Grade =>")),
+        ("City MPG",     epa.get("City") or epa.get("City =>")),
+        ("Highway MPG",  epa.get("Highway") or epa.get("Highway =>")),
+        ("Combined MPG", epa.get("Combined") or epa.get("Combined =>") or vds.get("mpg", {}).get("txt")),
+        ("Fuel Grade",   epa.get("Fuel Grade") or epa.get("Fuel Grade =>")),
     ]
     for i, (lbl, val) in enumerate(epa_fields):
         kv_row(lbl, val, alt=(i % 2 == 1))
