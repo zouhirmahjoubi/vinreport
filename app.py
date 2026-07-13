@@ -9,6 +9,7 @@ from email.mime.image import MIMEImage
 from email.mime.base import MIMEBase
 from email import encoders
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 app = Flask(__name__)
 
@@ -39,22 +40,22 @@ def generate_pdf_report(target_vin, specs):
             # Fallback text if logo fails to render
             pdf.set_font("Helvetica", "B", 20)
             pdf.set_text_color(13, 44, 84) # Dark Blue
-            pdf.cell(14, 10, "VIN", ln=False)
+            pdf.cell(14, 10, "VIN")
             pdf.set_text_color(216, 30, 30) # Red
-            pdf.cell(30, 10, "report", ln=True)
+            pdf.cell(30, 10, "report", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(5)
     else:
         pdf.set_font("Helvetica", "B", 20)
         pdf.set_text_color(13, 44, 84) # Dark Blue
-        pdf.cell(14, 10, "VIN", ln=False)
+        pdf.cell(14, 10, "VIN")
         pdf.set_text_color(216, 30, 30) # Red
-        pdf.cell(30, 10, "report", ln=True)
+        pdf.cell(30, 10, "report", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(5)
 
     # Powered by GoodCar
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(122, 139, 154)
-    pdf.cell(0, 5, "POWERED BY GOODCAR", ln=True, align="R")
+    pdf.cell(0, 5, "POWERED BY GOODCAR", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
     
     # Divider line
     pdf.set_draw_color(240, 243, 246)
@@ -66,16 +67,16 @@ def generate_pdf_report(target_vin, specs):
     pdf.set_fill_color(13, 44, 84) # #0d2c54
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 12, "  Vehicle History Report", ln=True, fill=True)
+    pdf.cell(0, 12, "  Vehicle History Report", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(176, 196, 222)
-    pdf.cell(0, 8, f"  VIN: {target_vin}", ln=True, fill=True)
+    pdf.cell(0, 8, f"  VIN: {target_vin}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
     pdf.ln(10)
     
     # Specs Section
     pdf.set_text_color(13, 44, 84)
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "SPECIFICATIONS", ln=True)
+    pdf.cell(0, 10, "SPECIFICATIONS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
     pdf.set_draw_color(13, 44, 84)
     pdf.set_line_width(1)
@@ -88,7 +89,7 @@ def generate_pdf_report(target_vin, specs):
         pdf.cell(60, 10, f" {label}", border="B")
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(44, 62, 80)
-        pdf.cell(0, 10, f" {value}", border="B", ln=True)
+        pdf.cell(0, 10, f" {value}", border="B", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     draw_row("Year", str(specs.get('year', 'N/A')))
     draw_row("Make", str(specs.get('make', 'N/A')))
@@ -99,7 +100,7 @@ def generate_pdf_report(target_vin, specs):
     # Disclaimer
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_text_color(85, 85, 85)
-    pdf.cell(0, 5, "NMVTIS Disclaimer", ln=True)
+    pdf.cell(0, 5, "NMVTIS Disclaimer", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(127, 140, 141)
@@ -112,6 +113,7 @@ def generate_pdf_report(target_vin, specs):
     pdf.multi_cell(0, 4, disclaimer_text)
     
     return pdf.output()
+
 
 def send_vin_report(target_vin, customer_email, specs):
     # Determine if logo.png exists for branding
@@ -336,15 +338,24 @@ def handle_etsy_order():
         "x-api-key": ETSY_API_KEY,
         "Authorization": f"Bearer {ETSY_OAUTH_TOKEN}"
     }
-    receipt_response = requests.get(resource_url, headers=etsy_headers)
-    receipt_details = receipt_response.json()
+    try:
+        receipt_response = requests.get(resource_url, headers=etsy_headers)
+        receipt_response.raise_for_status()
+        receipt_details = receipt_response.json()
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to retrieve receipt from Etsy: {str(e)}"}), 400
     
     # Extract personalization
     personalization_text = ""
     for transaction in receipt_details.get("transactions", []):
         for prop in transaction.get("property_values", []):
             if prop.get("property_name") == "Personalization":
-                personalization_text = prop.get("values", [""])[0]
+                val = prop.get("values", [""])[0]
+                if val:
+                    personalization_text = val
+                    break
+        if personalization_text:
+            break
 
     if not personalization_text:
         return jsonify({"status": "error", "message": "No personalization details found"}), 400
@@ -366,6 +377,7 @@ def handle_etsy_order():
     
     try:
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+        car_response.raise_for_status()
         car_data = car_response.json()
         specs = car_data.get("specifications", {})
     except Exception as e:
@@ -397,6 +409,7 @@ def test_report():
     
     try:
         car_response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+        car_response.raise_for_status()
         car_data = car_response.json()
         specs = car_data.get("specifications", {})
     except Exception as e:
