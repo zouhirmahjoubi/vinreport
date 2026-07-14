@@ -159,8 +159,8 @@ class PremiumVINReport(FPDF):
         self.set_auto_page_break(auto=False)
         self.set_margins(15, 15, 15)
         
-        # Color palette (Luxury Navy Blue, Red highlight, Gold accent, Green PASS)
-        self.c_navy = (13, 43, 92)       # #0D2B5C
+        # Color palette (GoodCar Inspired Green Theme blended with Luxury Navy)
+        self.c_navy = (13, 44, 84)        # #0D2C54
         self.c_red = (227, 34, 34)        # #E32222
         self.c_gold = (245, 180, 0)       # #F5B400
         self.c_green = (22, 163, 74)      # #16A34A
@@ -169,61 +169,67 @@ class PremiumVINReport(FPDF):
         self.c_white = (255, 255, 255)
         self.c_gray_text = (107, 114, 128)  # #6B7280
         self.c_border = (229, 231, 235)     # #E5E7EB
+        self.c_light_green = (230, 244, 234) # #E6F4EA
         
     def header(self):
         if self.page_no() == 1:
             return
-        # running header
+        
+        # Logo on the left, "Report on {Year} {Make} {Model}" on the right
         self.set_y(8)
-        self.set_font("Helvetica", "B", 10)
+        self.set_font("Helvetica", "B", 13)
         self.set_text_color(*self.c_navy)
-        self.cell(40, 5, "VINreport", align="L")
+        self.cell(100, 5, "VINreport", align="L")
         
-        self.set_font("Helvetica", "", 7.5)
-        self.set_text_color(*self.c_gray_text)
+        year = self.data.get("year") or "N/A"
+        make = self.data.get("make") or "N/A"
+        model = self.data.get("model") or "N/A"
+        self.set_font("Helvetica", "B", 10)
+        self.set_text_color(*self.c_dark)
+        self.cell(0, 5, f"Report on {year} {make} {model}", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        page_titles = {
-            2: "VEHICLE SPECIFICATIONS",
-            3: "MILEAGE & ODOMETER HISTORY",
-            4: "OWNERSHIP & TITLE HISTORY",
-            5: "ACCIDENT & DAMAGE REPORT",
-            6: "SALVAGE & INSURANCE RECORDS",
-            7: "TITLE BRANDS & PROBLEM CHECKS",
-            8: "MARKET VALUE ANALYSIS",
-            9: "VEHICLE SALES HISTORY",
-            10: "SAFETY RECALLS",
-            11: "NHTSA SAFETY COMPLAINTS",
-            12: "CRASH TEST RATINGS",
-            13: "AWARDS & RECOGNITION",
-            14: "RECOMMENDED MAINTENANCE",
-            15: "INSTALLED SAFETY EQUIPMENT",
-            16: "WARRANTY COVERAGE",
-            17: "COST OF OWNERSHIP",
-            18: "REGISTRATION & LOCATION HISTORY",
-            19: "EXECUTIVE SUMMARY",
-            20: "NMVTIS DISCLOSURE & DISCLAIMER",
-        }
-        title = page_titles.get(self.page_no(), "VEHICLE HISTORY REPORT")
-        self.cell(0, 5, title, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        # Horizontal line
+        # Horizontal divider line
         self.set_draw_color(*self.c_border)
-        self.set_line_width(0.2)
-        self.line(15, 14, 195, 14)
+        self.set_line_width(0.3)
+        self.line(15, 15, 195, 15)
+        
+        # "VIN: {VIN}" (bold green) and "Search Date: {Date}" (dark text)
+        self.set_y(17)
+        self.set_font("Helvetica", "B", 9.5)
+        self.set_text_color(*self.c_green)
+        self.cell(100, 5, f"VIN: {self.target_vin}", align="L")
+        
+        self.set_font("Helvetica", "", 8.5)
+        self.set_text_color(*self.c_gray_text)
+        from datetime import datetime
+        search_date = datetime.now().strftime("%B %d, %Y")
+        self.cell(0, 5, f"Search Date: {search_date}", align="R")
         
     def footer(self):
-        if self.page_no() == 1:
-            return
-        self.set_y(-15)
-        # Horizontal line
+        # Footer line on all pages
         self.set_draw_color(*self.c_border)
         self.set_line_width(0.2)
-        self.line(15, 282, 195, 282)
+        self.line(15, 281, 195, 281)
         
+        # Left text: "Report on {Year} {Make} {Model}"
+        self.set_y(282)
+        year = self.data.get("year") or "N/A"
+        make = self.data.get("make") or "N/A"
+        model = self.data.get("model") or "N/A"
         self.set_font("Helvetica", "", 7.5)
         self.set_text_color(*self.c_gray_text)
-        self.cell(100, 10, "Powered by GoodCar  |  vinreport.com", align="L")
-        self.cell(0, 10, f"Page {self.page_no()} of 20", align="R")
+        self.cell(100, 5, f"Report on {year} {make} {model}", align="L")
+        
+        # Right text: "Report generated on {Date}  |  Page X of 20"
+        from datetime import datetime
+        gen_date = datetime.now().strftime("%m/%d/%Y")
+        self.cell(0, 5, f"Report generated on {gen_date}  |  Page {self.page_no()} of 20", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        # Center disclaimer below
+        self.set_y(288)
+        self.set_font("Helvetica", "", 5.5)
+        self.set_text_color(*self.c_gray_text)
+        self.multi_cell(0, 3, "Disclaimer: The content of the NMVTIS Inquiry Data included in the report may have materially changed following this date.", align="C")
 
     # --- Drawing Helpers ---
     def draw_card(self, x, y, w, h, bg_color=None, border_color=None, radius=3, shadow=True):
@@ -247,15 +253,15 @@ class PremiumVINReport(FPDF):
         self.rect(x, y, w, h, style="FD", round_corners=True, corner_radius=radius)
 
     def draw_page_title(self, title, subtitle=None):
-        self.set_y(18)
-        self.set_font("Helvetica", "B", 15)
+        self.set_y(25)
+        self.set_font("Helvetica", "B", 14)
         self.set_text_color(*self.c_navy)
-        self.cell(0, 7, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 6, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         if subtitle:
-            self.set_font("Helvetica", "", 8.5)
+            self.set_font("Helvetica", "", 8.2)
             self.set_text_color(*self.c_gray_text)
-            self.cell(0, 5, subtitle, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.ln(2)
+            self.cell(0, 4, subtitle, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.ln(1.5)
 
     def draw_status_badge(self, x, y, text, status_type="success"):
         if status_type == "success":
@@ -304,14 +310,17 @@ class PremiumVINReport(FPDF):
             val_str = val_str[:35] + "..."
         self.cell(w * 0.5, 4, val_str)
 
-    def draw_card_header(self, x, y, title, highlight_red=False):
+    def draw_card_header(self, x, y, title, highlight_red=False, w=180):
+        h = 7.5
+        self.set_fill_color(*self.c_light_green)
+        self.set_draw_color(*self.c_green)
+        self.set_line_width(0.3)
+        self.rect(x, y, w, h, style="FD", round_corners=True, corner_radius=3)
+        
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
-        self.set_xy(x + 4, y + 3)
-        self.cell(0, 4, title)
-        self.set_draw_color(*(self.c_red if highlight_red else self.c_navy))
-        self.set_line_width(0.4)
-        self.line(x + 4, y + 7.5, x + 15, y + 7.5)
+        self.set_xy(x + 4, y + 1.8)
+        self.cell(w - 8, 4, title)
 
     def draw_table_grid(self, x, y, w, headers, rows, col_widths, row_h=5.5):
         # Draw headers
@@ -511,7 +520,9 @@ class PremiumVINReport(FPDF):
             if label == "Recalls" and stats["total_recalls"] > 0:
                 border_col = self.c_gold
                 
-            self.draw_card(item_x, item_y, w, h, border_color=border_col)
+            # Highlight badge card for warning
+            border_col = border_col or self.c_green
+            self.draw_card(item_x, item_y, w, h, border_color=border_col, shadow=False)
             self.set_xy(item_x + 3, item_y + 3)
             self.set_font("Helvetica", "B", 7.5)
             self.set_text_color(*self.c_gray_text)
@@ -522,11 +533,7 @@ class PremiumVINReport(FPDF):
             self.set_text_color(*self.c_navy)
             self.cell(w - 6, 6, str(val), align="C")
             
-        # Legal disclaimer line at the bottom
-        self.set_y(-18)
-        self.set_font("Helvetica", "", 7)
-        self.set_text_color(*self.c_gray_text)
-        self.multi_cell(0, 3.5, "Disclaimer: This complete history report is compiled from various government and commercial databases. Standard title checking procedures should be followed before vehicle purchase.", align="C")
+
 
     def draw_specifications_page(self):
         self.draw_page_title("Vehicle Specifications", f"Detailed manufactured data for VIN: {self.target_vin}")
@@ -550,7 +557,7 @@ class PremiumVINReport(FPDF):
         # Card 1: General Specs
         cx, cy, cw, ch = 15, 38, 87, 68
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "General Vehicle Specs")
+        self.draw_card_header(cx, cy, "General Vehicle Specs", w=cw)
         gen_fields = [
             ("Year", vds.get("year", {}).get("txt") or self.data.get("year", "N/A")),
             ("Make / Model", vds.get("make_model", {}).get("txt") or (f"{self.data.get('make')} {self.data.get('model')}")),
@@ -567,7 +574,7 @@ class PremiumVINReport(FPDF):
         # Card 2: Engine Specifications
         cx, cy, cw, ch = 108, 38, 87, 68
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Engine Specifications")
+        self.draw_card_header(cx, cy, "Engine Specifications", w=cw)
         eng_fields = [
             ("Engine Type", eng.get("Engine type") or eng.get("Engine type =>") or vds.get("engine", {}).get("txt")),
             ("Cylinders", eng.get("Cylinders") or eng.get("Cylinders =>")),
@@ -584,7 +591,7 @@ class PremiumVINReport(FPDF):
         # Card 3: Transmission & Drivetrain
         cx, cy, cw, ch = 15, 114, 87, 44
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Transmission & Drivetrain")
+        self.draw_card_header(cx, cy, "Transmission & Drivetrain", w=cw)
         trn_fields = [
             ("Transmission", trns.get("Brand Name") or trns.get("Brand Name =>") or vds.get("transmissions", {}).get("txt")),
             ("Transmission Type", trns.get("Type") or trns.get("Type =>")),
@@ -597,7 +604,7 @@ class PremiumVINReport(FPDF):
         # Card 4: Fuel Economy & Environmental
         cx, cy, cw, ch = 108, 114, 87, 44
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Fuel Economy (EPA)")
+        self.draw_card_header(cx, cy, "Fuel Economy (EPA)", w=cw)
         fuel_fields = [
             ("City Mileage", epa.get("City") or epa.get("City =>")),
             ("Highway Mileage", epa.get("Highway") or epa.get("Highway =>")),
@@ -1369,7 +1376,7 @@ class PremiumVINReport(FPDF):
         
         cx, cy, cw, ch = 116, 72, 79, 80
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Condition Comparison Retail")
+        self.draw_card_header(cx, cy, "Condition Comparison Retail", w=cw)
         
         cond_data = [
             ("Excellent Condition", "Extra Clean panels and original engine layout", 1.06),
@@ -1651,7 +1658,7 @@ class PremiumVINReport(FPDF):
         
         cx, cy, cw, ch = 15, 72, 87, 85
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Crash Category Star Ratings")
+        self.draw_card_header(cx, cy, "Crash Category Star Ratings", w=cw)
         
         ratings = [
             ("Front Driver Rating", crash_data.get("Front/Driver =>") or "5"),
@@ -1675,7 +1682,7 @@ class PremiumVINReport(FPDF):
             
         cx, cy, cw, ch = 108, 72, 87, 85
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Safety Impact Point Strengths")
+        self.draw_card_header(cx, cy, "Safety Impact Point Strengths", w=cw)
         
         silhouette_path = os.path.join(self.assets_dir, "car_silhouette.png")
         if os.path.exists(silhouette_path):
@@ -1745,7 +1752,7 @@ class PremiumVINReport(FPDF):
             card_y = cy + row * (h + 6)
             
             self.draw_card(card_x, card_y, w, h)
-            self.draw_card_header(card_x, card_y, aw["title"][:22], highlight_red=False)
+            self.draw_card_header(card_x, card_y, aw["title"][:22], highlight_red=False, w=w)
             
             self.draw_kv_in_card(card_x, card_y + 4, w, "Source", aw["src"], 0, False)
             self.draw_kv_in_card(card_x, card_y + 4, w, "Portal", aw["web"], 1, True)
@@ -1857,7 +1864,7 @@ class PremiumVINReport(FPDF):
         w, h = 87, 68
         
         self.draw_card(cx, cy, w, h)
-        self.draw_card_header(cx, cy, "Passive Safety Systems")
+        self.draw_card_header(cx, cy, "Passive Safety Systems", w=w)
         passive = safety_eq.get("Air Bags", {})
         airbags_items = [
             ("Front Driver Airbag", passive.get("Front Driver Airbag") or "Standard"),
@@ -1870,7 +1877,7 @@ class PremiumVINReport(FPDF):
             self.draw_kv_in_card(cx, cy + 6, w, lbl, val, idx, is_alt=(idx % 2 == 1))
             
         self.draw_card(108, cy, w, h)
-        self.draw_card_header(108, cy, "Active Driver Assistance")
+        self.draw_card_header(108, cy, "Active Driver Assistance", w=w)
         active = safety_eq.get("Electronic Stability Control (ESC)", {}) or safety_eq.get("Brake Systems", {})
         active_items = [
             ("ESC Stability Control", active.get("Electronic Stability Control (ESC)") or "Standard"),
@@ -1921,7 +1928,7 @@ class PremiumVINReport(FPDF):
             
             border_col = self.c_green if status == "Active" else self.c_gray_text
             self.draw_card(card_x, card_y, w, h, border_color=border_col)
-            self.draw_card_header(card_x, card_y, title)
+            self.draw_card_header(card_x, card_y, title, w=w)
             
             self.set_xy(card_x + 4, card_y + 9)
             self.set_font("Helvetica", "", 7.5)
@@ -2050,7 +2057,7 @@ class PremiumVINReport(FPDF):
         
         cx, cy, cw, ch = 15, 38, 87, 85
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Overall Vehicle Score")
+        self.draw_card_header(cx, cy, "Overall Vehicle Score", w=87)
         
         self.set_draw_color(229, 231, 235)
         self.set_line_width(2.5)
@@ -2071,7 +2078,7 @@ class PremiumVINReport(FPDF):
         
         cx = 108
         self.draw_card(cx, cy, cw, ch)
-        self.draw_card_header(cx, cy, "Category Health Checks")
+        self.draw_card_header(cx, cy, "Category Health Checks", w=cw)
         
         categories = [
             ("Title Brand Status", "PASSED", "success"),
