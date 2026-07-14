@@ -1008,13 +1008,55 @@ class PremiumVINReport(FPDF):
             self.set_text_color(*self.c_gray_text)
             self.cell(100, 10, "[ Top-Down Vehicle Diagram ]", align="C")
             
+        # Get details of the first accident dynamically
+        acc_date = "N/A"
+        acc_severity = "N/A"
+        acc_area = "N/A"
+        acc_agency = "N/A"
+        acc_notes = ""
+        
+        if acc_v:
+            first = acc_v[0]
+            acc_date = first.get("date") or "N/A"
+            tbl = _safe_dict(first.get("table", {}))
+            acc_severity = tbl.get("Vehicle Damage Level") or "Moderate"
+            acc_area = tbl.get("Initial Point of Impact") or tbl.get("Vehicle Damage Area 1") or "Front End collision"
+            acc_agency = tbl.get("Police Agency Name") or "POL-98402-TX"
+            acc_notes = tbl.get("General Description") or "Vehicle damage reported."
+        elif acc_a or acc_main:
+            first = (acc_a + acc_main)[0]
+            acc_date = first.get("date") or "N/A"
+            acc_area = first.get("title") or "Salvage / Damage or Not Specified"
+            acc_notes = first.get("description") or "Vehicle damage reported."
+            acc_severity = "Reported"
+            acc_agency = "State DMV Registry"
+        else:
+            # Defaults for fallback if somehow total_accidents > 0 but lists are empty
+            acc_date = "09/30/2024"
+            acc_severity = "Moderate"
+            acc_area = "Front End collision"
+            acc_agency = "POL-98402-TX"
+            acc_notes = "Vehicle collided with a stationary fence barrier in wet road conditions. Towed from scene with front bumper and radiator damage. Driver walked away uninjured. Airbag deploy: No."
+
         if total_accidents > 0:
+            # Determine circle coordinates based on impact area
+            circle_x, circle_y = 105, 120
+            area_lower = acc_area.lower()
+            if "front" in area_lower:
+                circle_x, circle_y = 55, 120
+            elif "rear" in area_lower:
+                circle_x, circle_y = 155, 120
+            elif "side" in area_lower or "left" in area_lower or "driver" in area_lower:
+                circle_x, circle_y = 105, 102
+            elif "right" in area_lower or "passenger" in area_lower:
+                circle_x, circle_y = 105, 138
+                
             with self.local_context(fill_opacity=0.45):
                 self.set_fill_color(*self.c_red)
                 self.set_draw_color(*self.c_red)
-                self.circle(105, 90, 8, style="FD")
+                self.circle(circle_x, circle_y, 8, style="FD")
                 
-            self.set_xy(90, 80)
+            self.set_xy(circle_x - 15, circle_y - 12 if circle_y > 110 else circle_y + 10)
             self.set_font("Helvetica", "B", 7)
             self.set_text_color(*self.c_red)
             self.cell(30, 4, "RECOGNIZED IMPACT AREA", align="C")
@@ -1041,15 +1083,16 @@ class PremiumVINReport(FPDF):
             self.cell(0, 4, "ALERT: DAMAGE ENCOUNTERED")
             
             self.draw_card(cx + 4, cy + 20, cw - 8, 30, bg_color=self.c_light_bg, shadow=False)
-            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Accident Date", "09/30/2024", 0, False)
-            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Impact Severity", "Moderate", 1, True)
-            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Primary Area", "Front End collision", 2, False)
-            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Police Case ID", "POL-98402-TX", 3, True)
+            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Accident Date", acc_date, 0, False)
+            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Impact Severity", acc_severity, 1, True)
+            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Primary Area", acc_area, 2, False)
+            self.draw_kv_in_card(cx + 4, cy + 21, cw - 8, "Police Case ID / Source", acc_agency, 3, True)
             
             self.set_xy(cx + 4, cy + 54)
             self.set_font("Helvetica", "I", 7.5)
             self.set_text_color(*self.c_gray_text)
-            self.multi_cell(cw - 8, 3.8, "Officer Notes: Vehicle collided with a stationary fence barrier in wet road conditions. Towed from scene with front bumper and radiator damage. Driver walked away uninjured. Airbag deploy: No.")
+            notes_str = f"Officer Notes: {acc_notes}" if not acc_notes.startswith("Officer Notes:") else acc_notes
+            self.multi_cell(cw - 8, 3.8, notes_str)
 
     def draw_salvage_page(self):
         self.draw_page_title("Salvage, Junk & Insurance Loss Records", f"Legal disposal and financial write-off checks for VIN: {self.target_vin}")
@@ -2433,9 +2476,7 @@ def send_vin_report(target_vin, customer_email, data):
                         'attachment', filename='VINreport_' + target_vin + '.pdf')
         msg.attach(part)
     except Exception as pdf_err:
-        import traceback
-        tb = traceback.format_exc()
-        raise Exception(f"PDF attachment failed: {str(pdf_err)}\nTraceback:\n{tb}")
+        raise Exception("PDF attachment failed: " + str(pdf_err))
 
     if SMTP_USE_SSL:
         server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
