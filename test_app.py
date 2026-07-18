@@ -43,6 +43,30 @@ class TestVinReportApp(unittest.TestCase):
             if logo_existed:
                 os.rename(logo_path + '.tmp', logo_path)
 
+    def test_generate_pdf_report_vinchk(self):
+        specs = {
+            'year': 2020,
+            'make': 'Toyota',
+            'model': 'Camry',
+            'engine_type': 'V6'
+        }
+        pdf_bytes = generate_pdf_report("1HGCR2F81HA000000", specs, template="vinchk")
+        self.assertIsInstance(pdf_bytes, (bytes, bytearray))
+        self.assertTrue(len(pdf_bytes) > 0)
+        self.assertIn(b"/Count 19", pdf_bytes)
+
+    def test_generate_pdf_report_vinreport(self):
+        specs = {
+            'year': 2020,
+            'make': 'Toyota',
+            'model': 'Camry',
+            'engine_type': 'V6'
+        }
+        pdf_bytes = generate_pdf_report("1HGCR2F81HA000000", specs, template="vinreport")
+        self.assertIsInstance(pdf_bytes, (bytes, bytearray))
+        self.assertTrue(len(pdf_bytes) > 0)
+        self.assertIn(b"/Count 19", pdf_bytes)
+
     @patch('smtplib.SMTP')
     def test_send_vin_report_no_logo(self, mock_smtp):
         # Mock SMTP server
@@ -147,7 +171,8 @@ class TestVinReportApp(unittest.TestCase):
             '1HGCR2F81HA000000',
             'customer@example.com',
             ANY,
-            ANY
+            ANY,
+            template=ANY
         )
 
     def test_handle_etsy_webhook_ignored_event(self):
@@ -257,7 +282,8 @@ class TestVinReportApp(unittest.TestCase):
             '1HGCR2F81HA000000',
             'test_customer@example.com',
             ANY,
-            ANY
+            ANY,
+            template=ANY
         )
 
 if __name__ == '__main__':
