@@ -5,6 +5,7 @@ import os
 import io
 import uuid
 import smtplib
+import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -15,7 +16,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
-from reportlab.graphics.shapes import Drawing, Rect, String, Line
+from reportlab.graphics.shapes import Drawing, Rect, String, Line, Circle
 
 app = Flask(__name__)
 
@@ -124,7 +125,7 @@ def fetch_vehicle_data(vin: str) -> dict:
     }
 
 # ==========================================
-# 🎨 PREMIUM PDF TEMPLATE ENGINE (REPORTLAB)
+# 🎨 PREMIUM PDF TEMPLATE ENGINE (GOODCAR STYLE)
 # ==========================================
 
 class NumberedCanvas(canvas.Canvas):
@@ -147,163 +148,249 @@ class NumberedCanvas(canvas.Canvas):
     def draw_page_decorations(self, page_count):
         self.saveState()
         vin = getattr(self, 'vin_for_header', 'N/A')
+        vehicle_title = getattr(self, 'vehicle_title_for_header', 'Vehicle')
+        search_date = getattr(self, 'search_date_for_header', '')
+        if not search_date:
+            search_date = datetime.datetime.now().strftime("%B %d, %Y")
+            
+        # 1. Header (on all pages)
+        # Logo: "GoodCar"
+        self.setFont('Helvetica-Bold', 18)
+        self.setFillColor(colors.HexColor('#0F172A'))
+        self.drawString(36, 755, "Good")
+        self.setFillColor(colors.HexColor('#475569'))
+        self.drawString(82, 755, "Car")
         
-        # Header on pages > 1
-        if self._pageNumber > 1:
-            self.setFont('Helvetica', 8)
+        # Center-Right Header Text: "Report on [Vehicle]"
+        self.setFont('Helvetica-Bold', 10)
+        self.setFillColor(colors.HexColor('#1E293B'))
+        self.drawRightString(576, 755, f"Report on {vehicle_title}")
+        
+        # Header Divider line
+        self.setStrokeColor(colors.HexColor('#CBD5E1'))
+        self.setLineWidth(0.5)
+        self.line(36, 745, 576, 745)
+        
+        # Search Details (Only on Page 1, below the main header line)
+        if self._pageNumber == 1:
+            self.setFont('Helvetica-Bold', 10)
+            self.setFillColor(colors.HexColor('#0F172A'))
+            self.drawString(36, 725, f"VIN: {vin}")
+            self.setFont('Helvetica', 9)
             self.setFillColor(colors.HexColor('#475569'))
-            self.drawString(36, 755, "VEHICLE SPECIFICATION & HISTORY REPORT")
-            self.drawRightString(576, 755, f"VIN: {vin}")
-            self.setStrokeColor(colors.HexColor('#E2E8F0'))
-            self.setLineWidth(0.5)
-            self.line(36, 747, 576, 747)
+            self.drawRightString(576, 725, f"Search Date: {search_date}")
 
-        # Footer on all pages
-        self.setStrokeColor(colors.HexColor('#E2E8F0'))
+        # 2. Footer (on all pages)
+        self.setStrokeColor(colors.HexColor('#CBD5E1'))
         self.setLineWidth(0.5)
         self.line(36, 45, 576, 45)
 
+        # Disclaimer (Small text above page info)
+        self.setFont('Helvetica', 6.5)
+        self.setFillColor(colors.HexColor('#64748B'))
+        self.drawString(36, 35, "Disclaimer: The content of the NMVTIS Inquiry Data included in the report may have materially changed following this date.")
+        
+        # Page info & generation timestamp
         self.setFont('Helvetica', 8)
         self.setFillColor(colors.HexColor('#475569'))
-        self.drawString(36, 32, "Sourced from public databases (NHTSA, MarketCheck). Verify details locally.")
-        self.drawRightString(576, 32, f"Page {self._pageNumber} of {page_count}")
+        gen_date = datetime.datetime.now().strftime("%m/%d/%Y")
+        self.drawString(36, 22, f"Report generated on {gen_date}")
+        self.drawRightString(576, 22, f"Page {self._pageNumber} of {page_count}")
+        
         self.restoreState()
 
+def make_card(title, value, is_alert, icon_type):
+    d = Drawing(165, 90)
+    border_color = colors.HexColor('#16A34A') # Green
+    if is_alert:
+        border_color = colors.HexColor('#DC2626') # Red
+        
+    # Card Border
+    d.add(Rect(0, 0, 165, 90, rx=5, ry=5, fillColor=colors.white, strokeColor=border_color, strokeWidth=1))
+    
+    # Icon background circle
+    d.add(Circle(82.5, 62, 15, fillColor=colors.HexColor('#F8FAFC'), strokeColor=border_color, strokeWidth=0.8))
+    
+    icon_color = colors.HexColor('#1E293B')
+    # Draw simple geometric icons
+    if icon_type == "mileage":
+        d.add(Circle(82.5, 62, 9, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(82.5, 62, 88.5, 68, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1.2))
+    elif icon_type == "title":
+        d.add(Rect(77.5, 55, 10, 12, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(79.5, 63, 83.5, 63, strokeColor=icon_color, strokeWidth=1))
+    elif icon_type == "accident":
+        d.add(Line(76.5, 56, 88.5, 68, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1.5))
+        d.add(Line(76.5, 68, 88.5, 56, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1.5))
+    elif icon_type == "owner":
+        d.add(Circle(82.5, 66, 4, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(76.5, 55, 88.5, 55, strokeColor=icon_color, strokeWidth=1))
+    elif icon_type == "salvage":
+        d.add(Rect(75.5, 55, 14, 10, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(75.5, 55, 89.5, 65, strokeColor=icon_color, strokeWidth=1))
+    elif icon_type == "loss":
+        d.add(Circle(82.5, 62, 6, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1))
+    elif icon_type == "check":
+        d.add(Rect(76.5, 57, 12, 8, strokeColor=icon_color, strokeWidth=1))
+        d.add(Circle(82.5, 61, 2.5, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1))
+    elif icon_type == "value":
+        d.add(String(82.5, 57, "$", textAnchor="middle", fontSize=11, fontName="Helvetica-Bold", fillColor=colors.HexColor('#16A34A')))
+    elif icon_type == "sales":
+        d.add(Line(75.5, 57, 81.5, 67, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(81.5, 67, 89.5, 61, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(89.5, 61, 83.5, 51, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(83.5, 51, 75.5, 57, strokeColor=icon_color, strokeWidth=1))
+    elif icon_type == "recall":
+        d.add(Circle(82.5, 62, 8, strokeColor=colors.HexColor('#DC2626'), strokeWidth=1.2))
+        d.add(String(82.5, 58, "!", textAnchor="middle", fontSize=10, fontName="Helvetica-Bold", fillColor=colors.HexColor('#DC2626')))
+    elif icon_type == "complaint":
+        d.add(Line(82.5, 69, 75.5, 55, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(75.5, 55, 89.5, 55, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(89.5, 55, 82.5, 69, strokeColor=icon_color, strokeWidth=1))
+    elif icon_type == "maintenance":
+        d.add(Rect(76.5, 55, 12, 12, strokeColor=icon_color, strokeWidth=1))
+        d.add(Line(76.5, 63, 88.5, 63, strokeColor=icon_color, strokeWidth=1))
+    else:
+        d.add(Circle(82.5, 62, 7, strokeColor=icon_color, strokeWidth=1))
+        
+    # Title
+    d.add(String(82.5, 30, title, textAnchor="middle", fontSize=8.5, fontName="Helvetica-Bold", fillColor=colors.HexColor('#1E293B')))
+    # Value
+    val_color = colors.HexColor('#DC2626') if is_alert else colors.HexColor('#16A34A')
+    d.add(String(82.5, 12, value, textAnchor="middle", fontSize=9.5, fontName="Helvetica-Bold", fillColor=val_color))
+    return d
+
 def generate_pdf_report(vin, data, output_path):
-    # Setup document: margins are 36pt (0.5 in). Printable area: 540 x 720 points
+    # Printable area: 540 x 720 points
+    # topMargin=75 to leave space for the large Page 1 search details
     doc = SimpleDocTemplate(
         output_path,
         pagesize=letter,
         leftMargin=36,
         rightMargin=36,
-        topMargin=54,
+        topMargin=75,
         bottomMargin=54
     )
     
+    specs = data.get("specs", {})
+    year = specs.get("ModelYear", "N/A")
+    make = specs.get("Make", "N/A")
+    model = specs.get("Model", "N/A")
+    vehicle_title = f"{year} {make} {model}"
+    search_date = datetime.datetime.now().strftime("%B %d, %Y")
+    
     class CustomNumberedCanvas(NumberedCanvas):
         vin_for_header = vin
+        vehicle_title_for_header = vehicle_title
+        search_date_for_header = search_date
         
     styles = getSampleStyleSheet()
     
-    # Custom styles
-    primary_color = colors.HexColor('#0B1B3D') # Deep Navy
-    secondary_color = colors.HexColor('#475569') # Slate Gray
-    accent_gray = colors.HexColor('#E2E8F0') # Light Slate
-    bg_light = colors.HexColor('#F8FAFC') # Off-White
-    
     styles.add(ParagraphStyle(
-        name='MainTitle',
+        name='MainTitleBold',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=24,
-        leading=28,
-        textColor=primary_color,
-        spaceAfter=6
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='SubTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=16,
-        textColor=secondary_color,
+        fontSize=20,
+        leading=24,
+        textColor=colors.HexColor('#0F172A'),
         spaceAfter=15
     ))
-
-    styles.add(ParagraphStyle(
-        name='SectionHeader',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=18,
-        textColor=colors.white,
-        spaceAfter=0
-    ))
     
     styles.add(ParagraphStyle(
-        name='TableHeader',
+        name='GridTextBold',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=9,
-        leading=12,
-        textColor=colors.white
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='TableCellBold',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        leading=12,
+        fontSize=10,
+        leading=14,
         textColor=colors.HexColor('#1E293B')
     ))
     
     styles.add(ParagraphStyle(
-        name='TableCell',
+        name='GridText',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=12,
+        fontSize=9.5,
+        leading=13,
         textColor=colors.HexColor('#334155')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='PassedBanner',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=20,
-        textColor=colors.HexColor('#15803D')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='PassedText',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor('#166534')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='AlertBanner',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=20,
-        textColor=colors.HexColor('#B91C1C')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='AlertText',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor('#991B1B')
     ))
 
     story = []
     
-    def build_header_band(title_text):
-        p = Paragraph(title_text, styles['SectionHeader'])
-        t = Table([[p]], colWidths=[540])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), primary_color),
-            ('TOPPADDING', (0,0), (-1,-1), 8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-            ('LEFTPADDING', (0,0), (-1,-1), 12),
-            ('RIGHTPADDING', (0,0), (-1,-1), 12),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
-        return t
+    # ------------------ PAGE 1: DASHBOARD GRID ------------------
+    story.append(Spacer(1, 10))
+    
+    history = data.get("history", [])
+    recalls = data.get("recalls", {})
+    recall_count = recalls.get("Count", 0)
+    
+    max_miles = "N/A"
+    if history:
+        try:
+            miles_list = [int(float(str(h.get("miles", 0)).replace(',', '').strip())) for h in history if h.get("miles")]
+            if miles_list:
+                max_miles = f"{max(miles_list):,} miles"
+        except Exception:
+            pass
 
-    # ------------------ PAGE 1: VEHICLE PASSPORT ------------------
-    story.append(build_header_band("VEHICLE PASSPORT"))
+    c1 = make_card("Mileage", max_miles, max_miles != "N/A", "mileage")
+    c2 = make_card("Title Records", "N/A (NMVTIS Restricted)", False, "title")
+    c3 = make_card("Accidents", "0 records found", False, "accident")
+    
+    c4 = make_card("Ownership History", "N/A", False, "owner")
+    c5 = make_card("Junk/Salvage Records", "0 records found", False, "salvage")
+    c6 = make_card("Total Loss Record", "0 records found", False, "loss")
+    
+    c7 = make_card("Problem Checks", "0 records found", False, "check")
+    c8 = make_card("Market Values", f"{len(history)} records found" if history else "0 records found", False, "value")
+    c9 = make_card("Sales History", f"{len(history)} records found" if history else "0 records found", False, "sales")
+    
+    c10 = make_card("Open Recalls", f"{recall_count} recalls found" if recall_count > 0 else "0 recalls found", recall_count > 0, "recall")
+    c11 = make_card("Safety Complaints", "0 records found", False, "complaint")
+    c12 = make_card("Maintenance Schedule", "Available", False, "maintenance")
+    
+    # Dashboard layout table (3 columns of 175 pt each = 525 pt, centered in 540 pt width)
+    grid_table = Table([
+        [c1, c2, c3],
+        [c4, c5, c6],
+        [c7, c8, c9],
+        [c10, c11, c12]
+    ], colWidths=[175, 175, 175])
+    
+    grid_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    
+    story.append(grid_table)
+    story.append(PageBreak())
+    
+    # ------------------ PAGE 2: SPECS CARD & VEHICLE DATA ------------------
+    p2_c1 = make_card("Auto Specs", "Available", False, "check")
+    p2_c2 = make_card("Crash Test Ratings", "0 records found", False, "accident")
+    p2_c3 = make_card("Awards & Accolades", "0 records found", False, "maintenance")
+    p2_c4 = make_card("Warranties", "0 records found", False, "title")
+    p2_c5 = make_card("Cost of Ownership", "Available", False, "value")
+    
+    p2_grid = Table([
+        [p2_c1, p2_c2, p2_c3],
+        [p2_c4, p2_c5, ""]
+    ], colWidths=[175, 175, 175])
+    
+    p2_grid.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+    ]))
+    
+    story.append(p2_grid)
     story.append(Spacer(1, 15))
     
-    specs = data.get("specs", {})
+    story.append(Paragraph("Vehicle Data", styles['MainTitleBold']))
     
     def clean_val(val):
         if val is None:
@@ -312,325 +399,148 @@ def generate_pdf_report(vin, data, output_path):
         if s == "" or s.lower() in ("none", "null", "n/a"):
             return "N/A"
         return s
-
-    year = clean_val(specs.get("ModelYear"))
-    make = clean_val(specs.get("Make"))
-    model = clean_val(specs.get("Model"))
-    trim = specs.get("Trim")
-    trim_clean = clean_val(trim)
-    full_name = f"{year} {make} {model}".upper()
-    sub_text = f"TRIM: {trim_clean.upper()}" if trim_clean != "N/A" else "SPECIFICATION CERTIFICATE"
+        
+    displacement = clean_val(specs.get("DisplacementL"))
+    disp_str = f"{displacement}L" if displacement != "N/A" else clean_val(specs.get("DisplacementCC"))
     
-    story.append(Paragraph(full_name, styles['MainTitle']))
-    story.append(Paragraph(sub_text, styles['SubTitle']))
+    vehicle_specs = [
+        ("Year", clean_val(specs.get("ModelYear"))),
+        ("Make, Model", f"{clean_val(specs.get('Make'))} {clean_val(specs.get('Model'))}"),
+        ("Trim", clean_val(specs.get("Trim"))),
+        ("Drive Type", clean_val(specs.get("DriveType"))),
+        ("Brake System", clean_val(specs.get("BrakeSystemType"))),
+        ("Restraint Type", clean_val(specs.get("OtherRestraintSystemInfo"))),
+        ("Manufactured In", f"{clean_val(specs.get('PlantCity'))}, {clean_val(specs.get('PlantCountry'))}".strip(', ')),
+        ("Style", clean_val(specs.get("BodyClass"))),
+        ("Body Type", clean_val(specs.get("VehicleType"))),
+        ("Body Subtype", clean_val(specs.get("BodyClass"))),
+        ("Doors", clean_val(specs.get("Doors"))),
+        ("Mfr Model Number", "N/A"),
+    ]
     
-    vin_p = Paragraph(f"<b>VIN:</b> {vin}", styles['TableCellBold'])
-    vin_table = Table([[vin_p]], colWidths=[250])
-    vin_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), bg_light),
-        ('GRID', (0,0), (-1,-1), 1, accent_gray),
+    specs_table_data = []
+    for label, val in vehicle_specs:
+        specs_table_data.append([
+            Paragraph(f"<b>{label}</b>", styles['GridText']),
+            Paragraph(str(val), styles['GridText'])
+        ])
+        
+    specs_table = Table(specs_table_data, colWidths=[180, 340])
+    
+    t_style = [
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
         ('PADDING', (0,0), (-1,-1), 6),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-    ]))
-    story.append(vin_table)
-    story.append(Spacer(1, 15))
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]
+    for i in range(len(specs_table_data)):
+        if i % 2 == 1:
+            t_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#F8FAFC')))
+    specs_table.setStyle(TableStyle(t_style))
     
-    # Modern tech graphic placeholder
-    d = Drawing(540, 100)
-    d.add(Rect(0, 0, 540, 100, fillColor=bg_light, strokeColor=accent_gray, strokeWidth=1))
-    d.add(Line(10, 10, 50, 10, strokeColor=primary_color, strokeWidth=2))
-    d.add(Line(10, 10, 10, 30, strokeColor=primary_color, strokeWidth=2))
-    d.add(Line(530, 90, 490, 90, strokeColor=primary_color, strokeWidth=2))
-    d.add(Line(530, 90, 530, 70, strokeColor=primary_color, strokeWidth=2))
-    for x in range(100, 450, 40):
-        d.add(Line(x, 15, x, 85, strokeColor=colors.HexColor('#F1F5F9'), strokeWidth=1))
-    for y in range(20, 90, 20):
-        d.add(Line(100, y, 440, y, strokeColor=colors.HexColor('#F1F5F9'), strokeWidth=1))
-    d.add(String(270, 55, "VEHICLE SPECIFICATION & HISTORY ARCHIVE", textAnchor="middle", fontSize=11, fontName="Helvetica-Bold", fillColor=primary_color))
-    d.add(String(270, 35, "OFFICIAL NHTSA & MARKET DATA PRE-RECORDED", textAnchor="middle", fontSize=8, fontName="Helvetica", fillColor=secondary_color))
-    story.append(d)
+    story.append(specs_table)
+    story.append(PageBreak())
+    
+    # ------------------ PAGE 3: MILEAGE LOG ------------------
+    story.append(Paragraph("Mileage", styles['MainTitleBold']))
+    
+    mileage_summary_data = [
+        [Paragraph("<b>Last Reported Mileage:</b>", styles['GridText']), Paragraph(max_miles, styles['GridText'])],
+        [Paragraph("<b>Estimated Mileage:</b>", styles['GridText']), Paragraph("N/A", styles['GridText'])]
+    ]
+    summary_table = Table(mileage_summary_data, colWidths=[180, 340])
+    summary_table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(summary_table)
     story.append(Spacer(1, 20))
     
-    disp_val = clean_val(specs.get("DisplacementL"))
-    if disp_val == "N/A":
-        disp_val = clean_val(specs.get("DisplacementCC"))
-        if disp_val != "N/A":
-            disp_val = f"{disp_val} cc"
-    else:
-        disp_val = f"{disp_val}L"
-        
-    cyl_val = clean_val(specs.get("EngineCylinders"))
-    if cyl_val != "N/A":
-        config = clean_val(specs.get("EngineConfiguration"))
-        if config == "In-Line":
-            cyl_val = f"I-{cyl_val}"
-        elif config == "V-Engine" or "V" in config or config.startswith("V"):
-            cyl_val = f"V-{cyl_val}"
-        else:
-            cyl_val = f"{cyl_val}-Cylinder"
-            
-    hp_val = clean_val(specs.get("EngineHP"))
-    if hp_val != "N/A":
-        hp_val = f"{hp_val} HP"
-        
-    engine_parts = [p for p in [disp_val, cyl_val, hp_val] if p != "N/A"]
-    engine_desc = " / ".join(engine_parts) if engine_parts else "N/A"
+    story.append(Paragraph("Vehicle Mileage Timeline", styles['MainTitleBold']))
     
-    city = clean_val(specs.get("PlantCity"))
-    state = clean_val(specs.get("PlantState"))
-    country = clean_val(specs.get("PlantCountry"))
-    origin_parts = [p for p in [city, state, country] if p != "N/A"]
-    origin = ", ".join(origin_parts) if origin_parts else "N/A"
+    timeline_data = [[
+        Paragraph("<b>Years</b>", styles['GridTextBold']),
+        Paragraph("<b>Mileage</b>", styles['GridTextBold'])
+    ]]
     
-    passport_specs = [
-        ("Body Class", clean_val(specs.get("BodyClass"))),
-        ("Engine", engine_desc),
-        ("Fuel Type", clean_val(specs.get("FuelTypePrimary"))),
-        ("Drivetrain", clean_val(specs.get("DriveType"))),
-        ("Transmission Style", clean_val(specs.get("TransmissionStyle"))),
-        ("Origin / Assembly Plant", origin),
-    ]
-    
-    passport_table_data = []
-    for label, val in passport_specs:
-        p_label = Paragraph(f"<b>{label}</b>", styles['TableCellBold'])
-        p_val = Paragraph(str(val), styles['TableCell'])
-        passport_table_data.append([p_label, p_val])
-        
-    passport_table = Table(passport_table_data, colWidths=[180, 360])
-    passport_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), bg_light),
-        ('GRID', (0,0), (-1,-1), 0.5, accent_gray),
-        ('PADDING', (0,0), (-1,-1), 10),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    story.append(passport_table)
-    story.append(PageBreak())
-    
-    # ------------------ PAGE 2: EQUIPMENT & OPTIONS ------------------
-    story.append(build_header_band("EQUIPMENT & OPTIONS"))
-    story.append(Spacer(1, 15))
-    
-    mech_specs = [
-        ("Engine Configuration", clean_val(specs.get("EngineConfiguration"))),
-        ("Cylinders", clean_val(specs.get("EngineCylinders"))),
-        ("Displacement (L)", clean_val(specs.get("DisplacementL"))),
-        ("Horsepower", clean_val(specs.get("EngineHP"))),
-        ("Valve Train Design", clean_val(specs.get("ValveTrainDesign"))),
-        ("Transmission Style", clean_val(specs.get("TransmissionStyle"))),
-        ("Wheel Size Front (in)", clean_val(specs.get("WheelSizeFront"))),
-        ("Wheel Size Rear (in)", clean_val(specs.get("WheelSizeRear"))),
-        ("Steering Location", clean_val(specs.get("SteeringLocation"))),
-    ]
-    
-    mech_table_data = [[Paragraph("<b>Mechanical Specification</b>", styles['TableCellBold']), ""]]
-    for label, val in mech_specs:
-        p_label = Paragraph(label, styles['TableCell'])
-        p_val = Paragraph(str(val), styles['TableCellBold'])
-        mech_table_data.append([p_label, p_val])
-        
-    mech_table = Table(mech_table_data, colWidths=[140, 110])
-    mech_table.setStyle(TableStyle([
-        ('SPAN', (0,0), (1,0)),
-        ('BACKGROUND', (0,0), (-1,0), bg_light),
-        ('LINEBELOW', (0,0), (-1,0), 1, primary_color),
-        ('GRID', (0,1), (-1,-1), 0.5, accent_gray),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
-    
-    safety_specs = [
-        ("Antilock Brakes (ABS)", clean_val(specs.get("ABS"))),
-        ("Stability Control (ESC)", clean_val(specs.get("ESC"))),
-        ("Traction Control", clean_val(specs.get("TractionControl"))),
-        ("Tire Pressure (TPMS)", clean_val(specs.get("TPMS"))),
-        ("Front Airbags", clean_val(specs.get("AirBagLocFront"))),
-        ("Side Airbags", clean_val(specs.get("AirBagLocSide"))),
-        ("Curtain Airbags", clean_val(specs.get("AirBagLocCurtain"))),
-        ("Forward Collision Warning", clean_val(specs.get("ForwardCollisionWarning"))),
-        ("Lane Departure Warning", clean_val(specs.get("LaneDepartureWarning"))),
-        ("Blind Spot Monitor", clean_val(specs.get("BlindSpotMon"))),
-    ]
-    
-    safety_table_data = [[Paragraph("<b>Safety & Driver Assist</b>", styles['TableCellBold']), ""]]
-    for label, val in safety_specs:
-        p_label = Paragraph(label, styles['TableCell'])
-        p_val = Paragraph(str(val), styles['TableCellBold'])
-        safety_table_data.append([p_label, p_val])
-        
-    safety_table = Table(safety_table_data, colWidths=[150, 110])
-    safety_table.setStyle(TableStyle([
-        ('SPAN', (0,0), (1,0)),
-        ('BACKGROUND', (0,0), (-1,0), bg_light),
-        ('LINEBELOW', (0,0), (-1,0), 1, primary_color),
-        ('GRID', (0,1), (-1,-1), 0.5, accent_gray),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
-    
-    parent_table = Table([[mech_table, "", safety_table]], colWidths=[250, 40, 250])
-    parent_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('PADDING', (0,0), (-1,-1), 0),
-    ]))
-    
-    story.append(parent_table)
-    story.append(PageBreak())
-    
-    # ------------------ PAGE 3: MARKET & MILEAGE LOG ------------------
-    story.append(build_header_band("MARKET & MILEAGE LOG"))
-    story.append(Spacer(1, 15))
-    
-    desc_p = Paragraph(
-        "This section details the online retail dealer listing history for this vehicle VIN. It captures historical pricing, recorded odometer milestones, and dealer listing locations over time.",
-        styles['TableCell']
-    )
-    story.append(desc_p)
-    story.append(Spacer(1, 15))
-    
-    history_list = data.get("history", [])
-    if history_list:
-        # Cap historical logs to 15 records to preserve template format on exactly 1 page
-        history_list = history_list[:15]
-        
-        history_table_data = [[
-            Paragraph("<b>Date Spoken</b>", styles['TableHeader']),
-            Paragraph("<b>Mileage</b>", styles['TableHeader']),
-            Paragraph("<b>Asking Price</b>", styles['TableHeader']),
-            Paragraph("<b>Dealer / Location</b>", styles['TableHeader'])
-        ]]
-        
-        for entry in history_list:
+    if history:
+        for entry in history:
             date_str = entry.get("scraped_at_date") or entry.get("last_seen_at_date") or entry.get("first_seen_at_date") or "N/A"
+            year_str = date_str.split('-')[0] if '-' in date_str else date_str
             miles = entry.get("miles")
-            try:
-                miles_val = int(float(str(miles).replace(',', '').strip()))
-                miles_str = f"{miles_val:,} mi"
-            except Exception:
-                miles_str = f"{miles} mi" if miles else "N/A"
-                
-            price = entry.get("price")
-            try:
-                price_val = int(float(str(price).replace('$', '').replace(',', '').strip()))
-                price_str = f"${price_val:,}"
-            except Exception:
-                price_str = f"${price}" if price else "N/A"
-            
-            dealer = entry.get("dealer", {})
-            dealer_name = dealer.get("name") or "Dealer"
-            dealer_city = dealer.get("city") or ""
-            dealer_state = dealer.get("state") or ""
-            loc_str = f"{dealer_name} ({dealer_city}, {dealer_state})" if dealer_city else dealer_name
-            
-            row_style = styles['TableCell']
-            history_table_data.append([
-                Paragraph(date_str, row_style),
-                Paragraph(miles_str, row_style),
-                Paragraph(price_str, row_style),
-                Paragraph(loc_str, row_style)
+            miles_str = f"{miles:,} miles" if miles is not None else "N/A"
+            timeline_data.append([
+                Paragraph(year_str, styles['GridText']),
+                Paragraph(miles_str, styles['GridText'])
             ])
-            
-        history_table = Table(history_table_data, colWidths=[80, 80, 80, 300])
-        
-        t_style = [
-            ('BACKGROUND', (0,0), (-1,0), primary_color),
-            ('GRID', (0,0), (-1,-1), 0.5, accent_gray),
-            ('PADDING', (0,0), (-1,-1), 8),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]
-        for i in range(1, len(history_table_data)):
-            if i % 2 == 0:
-                t_style.append(('BACKGROUND', (0, i), (-1, i), bg_light))
-        history_table.setStyle(TableStyle(t_style))
-        story.append(history_table)
     else:
-        card_content = [
-            [Paragraph("<b>NO HISTORICAL DEALER LISTINGS FOUND</b>", styles['TableCellBold'])],
-            [Paragraph("A search of dealer retail databases indicates that no listing records have been logged for this VIN. This is common and typical for vehicles that have been owned by a single private owner for their entire lifespan, or sold exclusively through private party transactions where retail inventory tracking systems do not scrape listings.", styles['TableCell'])]
-        ]
-        card_table = Table(card_content, colWidths=[520])
-        card_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), bg_light),
-            ('BOX', (0,0), (-1,-1), 1, secondary_color),
-            ('PADDING', (0,0), (-1,-1), 12),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ]))
-        story.append(card_table)
+        timeline_data.append([
+            Paragraph("N/A", styles['GridText']),
+            Paragraph("No listings timeline history available", styles['GridText'])
+        ])
         
+    timeline_table = Table(timeline_data, colWidths=[180, 340])
+    
+    time_style = [
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8FAFC')),
+        ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#CBD5E1')),
+        ('GRID', (0,1), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]
+    for i in range(1, len(timeline_data)):
+        if i % 2 == 0:
+            time_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#F8FAFC')))
+    timeline_table.setStyle(TableStyle(time_style))
+    story.append(timeline_table)
     story.append(PageBreak())
     
-    # ------------------ PAGE 4: SAFETY & RECALL CHECK ------------------
-    story.append(build_header_band("SAFETY & RECALL CHECK"))
-    story.append(Spacer(1, 15))
+    # ------------------ PAGE 4: SAFETY RECALL DETAILS ------------------
+    story.append(Paragraph("NHTSA Recalls", styles['MainTitleBold']))
+    story.append(Spacer(1, 10))
     
-    recalls = data.get("recalls", {})
-    count = recalls.get("Count", 0)
-    results = recalls.get("results", [])
-    
-    if count == 0 or not results:
-        banner_content = [
-            [Paragraph("✔ PASSED - NO OPEN RECALLS DETECTED", styles['PassedBanner'])],
-            [Paragraph("The National Highway Traffic Safety Administration (NHTSA) database indicates that there are currently no active, unremedied safety recalls open for this vehicle make, model, and year. Safety recalls are critical repairs mandated by the federal government and must be repaired by authorized dealerships at zero cost to the owner.", styles['PassedText'])]
-        ]
-        banner_table = Table(banner_content, colWidths=[520])
-        banner_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#DCFCE7')),
-            ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#16A34A')),
-            ('PADDING', (0,0), (-1,-1), 15),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ]))
-        story.append(banner_table)
+    if recall_count == 0:
+        story.append(Paragraph("<b>No active safety recalls found for this vehicle.</b>", styles['GridText']))
     else:
-        banner_content = [
-            [Paragraph("⚠ WARNING - ACTIVE SAFETY RECALLS FOUND", styles['AlertBanner'])],
-            [Paragraph(f"The NHTSA database has identified {count} open safety recall(s) associated with this vehicle make, model, and year. Active recalls represent critical, unresolved manufacturer defects that compromise passenger safety. Owners should immediately contact their local authorized dealer to schedule a free remedy repair.", styles['AlertText'])]
-        ]
-        banner_table = Table(banner_content, colWidths=[520])
-        banner_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEE2E2')),
-            ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#DC2626')),
-            ('PADDING', (0,0), (-1,-1), 15),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ]))
-        story.append(Spacer(1, 15))
-        story.append(banner_table)
-        story.append(Spacer(1, 15))
-        
-        # Display recalls list (max 3 for spacing)
-        displayed_recalls = results[:3]
-        for recall in displayed_recalls:
-            campaign_id = recall.get("NHTSACampaignNumber", "N/A")
-            component = recall.get("Component", "N/A")
-            reported_date = recall.get("ReportReceivedDate", "N/A")
-            summary = recall.get("Summary", "No summary provided.")
-            consequence = recall.get("Consequence", "No consequence provided.")
-            remedy = recall.get("Remedy", "No remedy specified.")
+        for idx, recall in enumerate(recalls.get("results", [])):
+            campaign_id = clean_val(recall.get("NHTSACampaignNumber"))
+            component = clean_val(recall.get("Component"))
+            mfr_campaign = clean_val(recall.get("Notes"))
+            notif_date = clean_val(recall.get("ReportReceivedDate"))
             
-            recall_data = [
-                (Paragraph("<b>NHTSA Campaign:</b>", styles['TableCellBold']), Paragraph(campaign_id, styles['TableCell'])),
-                (Paragraph("<b>Component:</b>", styles['TableCellBold']), Paragraph(component, styles['TableCell'])),
-                (Paragraph("<b>Report Date:</b>", styles['TableCellBold']), Paragraph(reported_date, styles['TableCell'])),
-                (Paragraph("<b>Defect Summary:</b>", styles['TableCellBold']), Paragraph(summary, styles['TableCell'])),
-                (Paragraph("<b>Safety Risk:</b>", styles['TableCellBold']), Paragraph(consequence, styles['TableCell'])),
-                (Paragraph("<b>Remedy Action:</b>", styles['TableCellBold']), Paragraph(remedy, styles['TableCell'])),
+            story.append(Paragraph(f"<b>Recall #{idx+1}</b>", styles['GridTextBold']))
+            story.append(Spacer(1, 6))
+            
+            recall_stats = [
+                [Paragraph("<b>NHTSA Campaign #:</b>", styles['GridText']), Paragraph(campaign_id, styles['GridText'])],
+                [Paragraph("<b>Manufacturer Campaign #:</b>", styles['GridText']), Paragraph(mfr_campaign, styles['GridText'])],
+                [Paragraph("<b>Owner Notification Date:</b>", styles['GridText']), Paragraph(notif_date, styles['GridText'])],
+                [Paragraph("<b>Report Creation Date:</b>", styles['GridText']), Paragraph(notif_date, styles['GridText'])],
             ]
-            
-            recall_table = Table(recall_data, colWidths=[120, 380])
-            recall_table.setStyle(TableStyle([
-                ('GRID', (0,0), (-1,-1), 0.5, accent_gray),
+            stats_table = Table(recall_stats, colWidths=[180, 340])
+            stats_table.setStyle(TableStyle([
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+                ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#F8FAFC')),
                 ('PADDING', (0,0), (-1,-1), 6),
-                ('BACKGROUND', (0,0), (0,-1), bg_light),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ]))
-            story.append(KeepTogether([
-                recall_table,
-                Spacer(1, 10)
-            ]))
+            story.append(stats_table)
+            story.append(Spacer(1, 8))
             
-        if len(results) > 3:
-            more_p = Paragraph(
-                f"<i>Note: There are {len(results) - 3} additional recalls. Showing the 3 most recent records. Visit NHTSA.gov for the full list.</i>",
-                styles['TableCell']
-            )
-            story.append(more_p)
+            story.append(Paragraph("<b>Defect Description:</b>", styles['GridTextBold']))
+            story.append(Paragraph(clean_val(recall.get("Summary")), styles['GridText']))
+            story.append(Spacer(1, 6))
+            
+            story.append(Paragraph("<b>Defect Consequences:</b>", styles['GridTextBold']))
+            story.append(Paragraph(clean_val(recall.get("Consequence")), styles['GridText']))
+            story.append(Spacer(1, 6))
+            
+            story.append(Paragraph("<b>Corrective Action:</b>", styles['GridTextBold']))
+            story.append(Paragraph(clean_val(recall.get("Remedy")), styles['GridText']))
+            story.append(Spacer(1, 15))
+            
+            line_draw = Drawing(540, 1)
+            line_draw.add(Line(0, 0, 540, 0, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=1))
+            story.append(line_draw)
+            story.append(Spacer(1, 15))
             
     doc.build(story, canvasmaker=CustomNumberedCanvas)
 
