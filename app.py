@@ -450,6 +450,9 @@ class PremiumVINReport(FPDF):
 
     def draw_cover_page(self):
         # Header Area
+        self.set_y(15)
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(*self.c_gray_text)
         logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
         if os.path.exists(logo_path):
             self.image(logo_path, x=15, y=13, h=10)
