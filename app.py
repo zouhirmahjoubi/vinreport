@@ -475,22 +475,11 @@ class PremiumVINReport(FPDF):
         self.cell(0, 10, "COMPLETE VEHICLE HISTORY REPORT", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(2)
         
-        # Cover Car Image
-        cover_img_path = os.path.join(self.assets_dir, "cover_car.png")
-        if os.path.exists(cover_img_path):
-            self.image(cover_img_path, 15, 45, 180, 95)
-        else:
-            self.draw_card(15, 45, 180, 95, bg_color=(240, 243, 246), shadow=False)
-            self.set_xy(15, 85)
-            self.set_font("Helvetica", "I", 12)
-            self.set_text_color(*self.c_gray_text)
-            self.cell(180, 10, "[ Sleek Vehicle Image Cover ]", align="C")
-            
-        # Vehicle Specs Banner Card
-        self.draw_card(15, 148, 180, 32, bg_color=self.c_navy, shadow=True)
+        # Vehicle Specs Banner Card (Shifted up since cover car image was removed)
+        self.draw_card(15, 46, 180, 32, bg_color=self.c_navy, shadow=True)
         self.set_text_color(*self.c_white)
         self.set_font("Helvetica", "B", 13)
-        self.set_xy(20, 152)
+        self.set_xy(20, 50)
         year = self.data.get("year", "N/A")
         make = self.data.get("make", "N/A")
         model = self.data.get("model", "N/A")
@@ -498,14 +487,14 @@ class PremiumVINReport(FPDF):
         
         self.set_font("Helvetica", "", 9)
         self.set_text_color(209, 213, 219)
-        self.set_xy(20, 159)
+        self.set_xy(20, 57)
         self.cell(100, 5, f"VIN: {self.target_vin}")
         
         # Status Badge
         stats = self.get_summary_stats()
         status_text = "Clean Title" if stats["total_accidents"] == 0 else "Brand Alert / Damage"
         status_type = "success" if stats["total_accidents"] == 0 else "danger"
-        self.draw_status_badge(148, 155, status_text, status_type)
+        self.draw_status_badge(148, 53, status_text, status_type)
         
         # Summary Grid - 6 Cards
         self.set_font("Helvetica", "", 8)
@@ -518,7 +507,7 @@ class PremiumVINReport(FPDF):
             ("Market Value", stats["market_val"])
         ]
         
-        cx, cy = 15, 187
+        cx, cy = 15, 86
         w, h = 56, 24
         for idx, (label, val) in enumerate(grid_items):
             col = idx % 3
@@ -557,11 +546,6 @@ class PremiumVINReport(FPDF):
             with self.local_context(fill_opacity=0.06):
                 self.image(blueprint_path, 15, 60, 180, 115)
                 
-        # Small vehicle photo in top-right corner
-        cover_img_path = os.path.join(self.assets_dir, "cover_car.png")
-        if os.path.exists(cover_img_path):
-            self.image(cover_img_path, 152, 17, 43, 24)
-            
         vds = self.data.get("vehicle_data_specs", {})
         eng = self.data.get("engine", {})
         trns = self.data.get("transmission", {})
