@@ -2359,18 +2359,18 @@ def send_vin_report(target_vin, customer_email, report_id, data):
     recalls    = data.get("recalls", {})
     recall_cnt = recalls.get("itemsCount", 0) or 0
     recall_badge = (
-        '<span style="color:#c0392b;font-weight:bold;">' + str(recall_cnt) + ' Recall(s)</span>'
+        '<span style="background-color: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: inline-block; border: 1px solid #fecaca;">⚠️ ' + str(recall_cnt) + ' Recall(s)</span>'
         if recall_cnt else
-        '<span style="color:#27ae60;font-weight:bold;">No Open Recalls</span>'
+        '<span style="background-color: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: inline-block; border: 1px solid #bbf7d0;">✅ No Recalls</span>'
     )
 
     acc_count = len(data.get("accidents_v", {}).get("rows", [])) + \
                 len(data.get("accidents_a", {}).get("rows", [])) + \
                 len(data.get("accidents", {}).get("rows", []))
     acc_badge = (
-        '<span style="color:#c0392b;font-weight:bold;">' + str(acc_count) + ' Accident Record(s)</span>'
+        '<span style="background-color: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: inline-block; border: 1px solid #fecaca;">⚠️ ' + str(acc_count) + ' Accident(s)</span>'
         if acc_count else
-        '<span style="color:#27ae60;font-weight:bold;">No Accidents Reported</span>'
+        '<span style="background-color: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: inline-block; border: 1px solid #bbf7d0;">✅ No Accidents</span>'
     )
 
     download_url = f"{DOKPLOY_APP_URL}/download/{report_id}"
@@ -2382,24 +2382,24 @@ def send_vin_report(target_vin, customer_email, report_id, data):
         <meta charset="utf-8">
         <style>
             body{{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background-color:#f4f6f9;margin:0;padding:0;color:#333}}
-            .container{{max-width:600px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 4px 10px rgba(0,0,0,.05);border:1px solid #e1e8ed}}
+            .container{{max-width:600px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1);border:1px solid #e2e8f0}}
             .header{{padding:30px;border-bottom:1px solid #f0f3f6}}
             .badge{{font-size:11px;color:#7a8b9a;text-transform:uppercase;letter-spacing:1px;margin:0;font-weight:bold}}
             .content{{padding:30px}}
-            .hero{{background:linear-gradient(135deg,#0d2c54 0%,#1b497e 100%);color:#fff;padding:30px;border-radius:6px;margin-bottom:25px;text-align:center}}
+            .hero{{background:linear-gradient(135deg,#0f172a 0%,#2563eb 100%);color:#fff;padding:30px;border-radius:8px;margin-bottom:25px;text-align:center}}
             .hero h2{{margin:0 0 10px;font-size:24px;font-weight:600}}
-            .hero p{{margin:0;font-size:14px;color:#b0c4de;letter-spacing:.5px}}
+            .hero p{{margin:0;font-size:14px;color:#93c5fd;letter-spacing:.5px}}
             .summary-grid{{display:flex;gap:12px;margin-bottom:25px}}
-            .summary-card{{flex:1;background:#f8fafc;border:1px solid #e1e8ed;border-radius:6px;padding:15px;text-align:center}}
-            .summary-card .label{{font-size:11px;color:#7a8b9a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}}
-            .summary-card .value{{font-size:14px;font-weight:700;color:#0d2c54}}
+            .summary-card{{flex:1;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -2px rgba(0,0,0,0.05)}}
+            .summary-card .label{{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:600}}
+            .summary-card .value{{font-size:13px;font-weight:700;color:#0f172a}}
             .btn-container{{text-align:center;margin:30px 0}}
-            .btn{{background-color:#16a34a;color:#ffffff !important;padding:14px 28px;text-decoration:none;border-radius:5px;font-weight:bold;display:inline-block;font-size:16px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}}
-            .section-title{{font-size:16px;font-weight:bold;color:#0d2c54;margin-top:25px;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #f0f3f6;padding-bottom:8px}}
+            .btn{{background-color:#2563eb;color:#ffffff !important;padding:14px 28px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block;font-size:16px;box-shadow:0 4px 6px rgba(37,99,235,0.2);}}
+            .section-title{{font-size:16px;font-weight:bold;color:#0f172a;margin-top:25px;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #f0f3f6;padding-bottom:8px}}
             .specs-table{{width:100%;border-collapse:collapse;margin-bottom:20px}}
             .specs-table td{{padding:10px;border-bottom:1px solid #f0f3f6;font-size:14px}}
-            .specs-label{{font-weight:600;color:#5a6e85;width:40%}}
-            .specs-value{{color:#2c3e50}}
+            .specs-label{{font-weight:600;color:#64748b;width:40%}}
+            .specs-value{{color:#0f172a}}
             .footer{{background:#f8fafc;padding:20px 30px;border-top:1px solid #f0f3f6;font-size:11px;color:#7f8c8d;line-height:1.6}}
             .disclaimer-title{{font-weight:bold;margin-bottom:5px;color:#555}}
         </style>
@@ -2408,7 +2408,6 @@ def send_vin_report(target_vin, customer_email, report_id, data):
         <div class="container">
             <div class="header">
                 <div style="display:inline-block;vertical-align:middle">{logo_html}</div>
-                <div style="display:inline-block;vertical-align:middle;float:right;margin-top:15px"><p class="badge">Powered by GoodCar</p></div>
             </div>
             <div class="content">
                 <div class="hero">
@@ -2418,7 +2417,9 @@ def send_vin_report(target_vin, customer_email, report_id, data):
                 <div class="summary-grid">
                     <div class="summary-card">
                         <div class="label">Last Mileage</div>
-                        <div class="value">{str(last_miles)}</div>
+                        <div class="value" style="margin-top: 6px;">
+                            <span style="background-color: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: inline-block; border: 1px solid #bfdbfe;">📍 {str(last_miles)}</span>
+                        </div>
                     </div>
                     <div class="summary-card">
                         <div class="label">Accidents</div>
