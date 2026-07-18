@@ -179,9 +179,15 @@ class PremiumVINReport(FPDF):
         
         # Logo on the left, "Report on {Year} {Make} {Model}" on the right
         self.set_y(8)
-        self.set_font("Helvetica", "B", 13)
-        self.set_text_color(*self.c_navy)
-        self.cell(100, 5, "VINreport", align="L")
+        logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
+        if os.path.exists(logo_path):
+            self.image(logo_path, x=15, y=5, h=6)
+            self.set_font("Helvetica", "B", 13)
+            self.cell(100, 5, "", align="L")
+        else:
+            self.set_font("Helvetica", "B", 13)
+            self.set_text_color(*self.c_navy)
+            self.cell(100, 5, "VINreport", align="L")
         
         year = self.data.get("year") or "N/A"
         make = self.data.get("make") or "N/A"
@@ -222,10 +228,10 @@ class PremiumVINReport(FPDF):
         self.set_text_color(*self.c_gray_text)
         self.cell(100, 5, f"Report on {year} {make} {model}", align="L")
         
-        # Right text: "Report generated on {Date}  |  Page X of 20"
+        # Right text: "Report generated on {Date}  |  Page X of 19"
         from datetime import datetime
         gen_date = datetime.now().strftime("%m/%d/%Y")
-        self.cell(0, 5, f"Report generated on {gen_date}  |  Page {self.page_no()} of 20", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 5, f"Report generated on {gen_date}  |  Page {self.page_no()} of 19", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Center disclaimer below
         self.set_y(288)
@@ -444,13 +450,15 @@ class PremiumVINReport(FPDF):
 
     def draw_cover_page(self):
         # Header Area
-        self.set_y(15)
-        self.set_font("Helvetica", "B", 18)
-        self.set_text_color(*self.c_navy)
-        self.cell(40, 10, "VINreport", align="L")
-        self.set_font("Helvetica", "B", 8)
-        self.set_text_color(*self.c_gray_text)
-        self.cell(0, 10, "", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        logo_path = os.path.join(os.path.dirname(__file__), 'logo.png')
+        if os.path.exists(logo_path):
+            self.image(logo_path, x=15, y=13, h=10)
+            self.cell(0, 10, "", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        else:
+            self.set_font("Helvetica", "B", 18)
+            self.set_text_color(*self.c_navy)
+            self.cell(40, 10, "VINreport", align="L")
+            self.cell(0, 10, "", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Thin Divider
         self.set_draw_color(*self.c_border)
@@ -2262,9 +2270,6 @@ def generate_report(target_vin, data):
     pdf.add_page()
     pdf.draw_final_summary_page()
     
-    pdf.add_page()
-    pdf.draw_disclaimer_page()
-    
     return pdf
 
 def generate_pdf_report(target_vin, data):
@@ -2327,9 +2332,6 @@ def generate_pdf_report(target_vin, data):
     
     pdf.add_page()
     pdf.draw_final_summary_page()
-    
-    pdf.add_page()
-    pdf.draw_disclaimer_page()
     
     return pdf.output()
 

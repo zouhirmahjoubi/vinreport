@@ -38,7 +38,7 @@ class TestVinReportApp(unittest.TestCase):
             pdf_bytes = generate_pdf_report("1HGCR2F81HA000000", specs)
             self.assertIsInstance(pdf_bytes, (bytes, bytearray))
             self.assertTrue(len(pdf_bytes) > 0)
-            self.assertIn(b"/Count 20", pdf_bytes)
+            self.assertIn(b"/Count 19", pdf_bytes)
         finally:
             if logo_existed:
                 os.rename(logo_path + '.tmp', logo_path)
