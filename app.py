@@ -199,6 +199,18 @@ class NumberedCanvas(canvas.Canvas):
         
         self.restoreState()
 
+def clean_val(value):
+    """
+    Step 1: Clean up None or Empty values.
+    Replaces blank parameters with 'Not Equipped / Not Logged' placeholder.
+    """
+    if value is None:
+        return "Not Equipped / Not Logged"
+    s = str(value).strip()
+    if s == "" or s.lower() in ("none", "null", "n/a", "not equipped / not logged"):
+        return "Not Equipped / Not Logged"
+    return s
+
 def make_card(title, value, is_alert, icon_type):
     d = Drawing(165, 90)
     border_color = colors.HexColor('#16A34A') # Green
@@ -256,8 +268,14 @@ def make_card(title, value, is_alert, icon_type):
     # Title
     d.add(String(82.5, 30, title, textAnchor="middle", fontSize=8.5, fontName="Helvetica-Bold", fillColor=colors.HexColor('#1E293B')))
     # Value
-    val_color = colors.HexColor('#DC2626') if is_alert else colors.HexColor('#16A34A')
-    d.add(String(82.5, 12, value, textAnchor="middle", fontSize=9.5, fontName="Helvetica-Bold", fillColor=val_color))
+    val_cleaned = clean_val(value)
+    # Check if value has a count of records or is standard text
+    val_color = colors.HexColor('#16A34A') # Green
+    if is_alert or "recalls found" in val_cleaned or "miles" in val_cleaned:
+        if val_cleaned != "Not Equipped / Not Logged" and "0 recalls found" not in val_cleaned:
+            val_color = colors.HexColor('#DC2626') # Red alert
+            
+    d.add(String(82.5, 12, val_cleaned, textAnchor="middle", fontSize=9.5, fontName="Helvetica-Bold", fillColor=val_color))
     return d
 
 def generate_pdf_report(vin, data, output_path):
@@ -273,9 +291,9 @@ def generate_pdf_report(vin, data, output_path):
     )
     
     specs = data.get("specs", {})
-    year = specs.get("ModelYear", "N/A")
-    make = specs.get("Make", "N/A")
-    model = specs.get("Model", "N/A")
+    year = clean_val(specs.get("ModelYear"))
+    make = clean_val(specs.get("Make"))
+    model = clean_val(specs.get("Model"))
     vehicle_title = f"{year} {make} {model}"
     search_date = datetime.datetime.now().strftime("%B %d, %Y")
     
@@ -313,6 +331,16 @@ def generate_pdf_report(vin, data, output_path):
         leading=13,
         textColor=colors.HexColor('#334155')
     ))
+    
+    # Styled Soft-Blue Banner Styles
+    styles.add(ParagraphStyle(
+        name='InfoTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#1E3A8A')
+    ))
 
     story = []
     
@@ -323,7 +351,7 @@ def generate_pdf_report(vin, data, output_path):
     recalls = data.get("recalls", {})
     recall_count = recalls.get("Count", 0)
     
-    max_miles = "N/A"
+    max_miles = "Not Equipped / Not Logged"
     if history:
         try:
             miles_list = [int(float(str(h.get("miles", 0)).replace(',', '').strip())) for h in history if h.get("miles")]
@@ -332,11 +360,11 @@ def generate_pdf_report(vin, data, output_path):
         except Exception:
             pass
 
-    c1 = make_card("Mileage", max_miles, max_miles != "N/A", "mileage")
+    c1 = make_card("Mileage", max_miles, max_miles != "Not Equipped / Not Logged", "mileage")
     c2 = make_card("Title Records", "N/A (NMVTIS Restricted)", False, "title")
     c3 = make_card("Accidents", "0 records found", False, "accident")
     
-    c4 = make_card("Ownership History", "N/A", False, "owner")
+    c4 = make_card("Ownership History", "Not Equipped / Not Logged", False, "owner")
     c5 = make_card("Junk/Salvage Records", "0 records found", False, "salvage")
     c6 = make_card("Total Loss Record", "0 records found", False, "loss")
     
@@ -392,37 +420,77 @@ def generate_pdf_report(vin, data, output_path):
     
     story.append(Paragraph("Vehicle Data", styles['MainTitleBold']))
     
-    def clean_val(val):
-        if val is None:
-            return "N/A"
-        s = str(val).strip()
-        if s == "" or s.lower() in ("none", "null", "n/a"):
-            return "N/A"
-        return s
+    disp_val = clean_val(specs.get("DisplacementL"))
+    if disp_val == "Not Equipped / Not Logged":
+        disp_val = clean_val(specs.get("DisplacementCC"))
+        if disp_val != "Not Equipped / Not Logged":
+            disp_val = f"{disp_val} cc"
+    else:
+        disp_val = f"{disp_val}L"
         
-    displacement = clean_val(specs.get("DisplacementL"))
-    disp_str = f"{displacement}L" if displacement != "N/A" else clean_val(specs.get("DisplacementCC"))
+    cyl_val = clean_val(specs.get("EngineCylinders"))
+    if cyl_val != "Not Equipped / Not Logged":
+        config = clean_val(specs.get("EngineConfiguration"))
+        if config == "In-Line":
+            cyl_val = f"I-{cyl_val}"
+        elif config == "V-Engine" or "V" in config or config.startswith("V"):
+            cyl_val = f"V-{cyl_val}"
+        else:
+            cyl_val = f"{cyl_val}-Cylinder"
+            
+    hp_val = clean_val(specs.get("EngineHP"))
+    if hp_val != "Not Equipped / Not Logged":
+        hp_val = f"{hp_val} HP"
+        
+    engine_parts = [p for p in [disp_val, cyl_val, hp_val] if p != "Not Equipped / Not Logged"]
+    engine_desc = " / ".join(engine_parts) if engine_parts else "Not Equipped / Not Logged"
+    
+    city = clean_val(specs.get("PlantCity"))
+    state = clean_val(specs.get("PlantState"))
+    country = clean_val(specs.get("PlantCountry"))
+    origin_parts = [p for p in [city, state, country] if p != "Not Equipped / Not Logged"]
+    origin = ", ".join(origin_parts) if origin_parts else "Not Equipped / Not Logged"
     
     vehicle_specs = [
         ("Year", clean_val(specs.get("ModelYear"))),
         ("Make, Model", f"{clean_val(specs.get('Make'))} {clean_val(specs.get('Model'))}"),
         ("Trim", clean_val(specs.get("Trim"))),
         ("Drive Type", clean_val(specs.get("DriveType"))),
-        ("Brake System", clean_val(specs.get("BrakeSystemType"))),
+        ("Transmission Style", clean_val(specs.get("TransmissionStyle"))),
+        ("Primary Fuel Type", clean_val(specs.get("FuelTypePrimary"))),
+        ("Engine Configuration", clean_val(specs.get("EngineConfiguration"))),
+        ("Engine Cylinders", clean_val(specs.get("EngineCylinders"))),
+        ("Engine Displacement", engine_desc),
+        ("Brake System Type", clean_val(specs.get("BrakeSystemType"))),
         ("Restraint Type", clean_val(specs.get("OtherRestraintSystemInfo"))),
-        ("Manufactured In", f"{clean_val(specs.get('PlantCity'))}, {clean_val(specs.get('PlantCountry'))}".strip(', ')),
-        ("Style", clean_val(specs.get("BodyClass"))),
-        ("Body Type", clean_val(specs.get("VehicleType"))),
-        ("Body Subtype", clean_val(specs.get("BodyClass"))),
+        ("Antilock Brakes (ABS)", clean_val(specs.get("ABS"))),
+        ("Stability Control (ESC)", clean_val(specs.get("ESC"))),
+        ("Traction Control", clean_val(specs.get("TractionControl"))),
+        ("Tire Pressure (TPMS)", clean_val(specs.get("TPMS"))),
+        ("Front Airbag Location", clean_val(specs.get("AirBagLocFront"))),
+        ("Side Airbag Location", clean_val(specs.get("AirBagLocSide"))),
+        ("Curtain Airbag Location", clean_val(specs.get("AirBagLocCurtain"))),
+        ("Manufactured In", origin),
+        ("Body Class", clean_val(specs.get("BodyClass"))),
         ("Doors", clean_val(specs.get("Doors"))),
-        ("Mfr Model Number", "N/A"),
+        ("Mfr Model Number", "Not Equipped / Not Logged"),
     ]
     
+    # Step 2: Dynamically Hide Entire Rows
     specs_table_data = []
     for label, val in vehicle_specs:
+        # Hide row entirely if value is "Not Equipped / Not Logged"
+        if val != "Not Equipped / Not Logged":
+            specs_table_data.append([
+                Paragraph(f"<b>{label}</b>", styles['GridText']),
+                Paragraph(str(val), styles['GridText'])
+            ])
+            
+    # Always guarantee at least one row in case of sparse data
+    if not specs_table_data:
         specs_table_data.append([
-            Paragraph(f"<b>{label}</b>", styles['GridText']),
-            Paragraph(str(val), styles['GridText'])
+            Paragraph("<b>Vehicle Specs</b>", styles['GridText']),
+            Paragraph("No specification parameters logged", styles['GridText'])
         ])
         
     specs_table = Table(specs_table_data, colWidths=[180, 340])
@@ -443,55 +511,74 @@ def generate_pdf_report(vin, data, output_path):
     # ------------------ PAGE 3: MILEAGE LOG ------------------
     story.append(Paragraph("Mileage", styles['MainTitleBold']))
     
-    mileage_summary_data = [
-        [Paragraph("<b>Last Reported Mileage:</b>", styles['GridText']), Paragraph(max_miles, styles['GridText'])],
-        [Paragraph("<b>Estimated Mileage:</b>", styles['GridText']), Paragraph("N/A", styles['GridText'])]
-    ]
-    summary_table = Table(mileage_summary_data, colWidths=[180, 340])
-    summary_table.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
-        ('PADDING', (0,0), (-1,-1), 8),
-    ]))
-    story.append(summary_table)
-    story.append(Spacer(1, 20))
+    # Filter mileage summary table
+    mileage_summary_data = []
+    if max_miles != "Not Equipped / Not Logged":
+        mileage_summary_data.append([
+            Paragraph("<b>Last Reported Mileage:</b>", styles['GridText']),
+            Paragraph(max_miles, styles['GridText'])
+        ])
+    
+    if mileage_summary_data:
+        summary_table = Table(mileage_summary_data, colWidths=[180, 340])
+        summary_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+            ('PADDING', (0,0), (-1,-1), 8),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 20))
     
     story.append(Paragraph("Vehicle Mileage Timeline", styles['MainTitleBold']))
     
-    timeline_data = [[
-        Paragraph("<b>Years</b>", styles['GridTextBold']),
-        Paragraph("<b>Mileage</b>", styles['GridTextBold'])
-    ]]
-    
     if history:
+        timeline_data = [[
+            Paragraph("<b>Years</b>", styles['GridTextBold']),
+            Paragraph("<b>Mileage</b>", styles['GridTextBold'])
+        ]]
         for entry in history:
             date_str = entry.get("scraped_at_date") or entry.get("last_seen_at_date") or entry.get("first_seen_at_date") or "N/A"
             year_str = date_str.split('-')[0] if '-' in date_str else date_str
             miles = entry.get("miles")
-            miles_str = f"{miles:,} miles" if miles is not None else "N/A"
-            timeline_data.append([
-                Paragraph(year_str, styles['GridText']),
-                Paragraph(miles_str, styles['GridText'])
-            ])
-    else:
-        timeline_data.append([
-            Paragraph("N/A", styles['GridText']),
-            Paragraph("No listings timeline history available", styles['GridText'])
-        ])
+            miles_str = f"{miles:,} miles" if miles is not None else "Not Equipped / Not Logged"
+            if miles_str != "Not Equipped / Not Logged":
+                timeline_data.append([
+                    Paragraph(year_str, styles['GridText']),
+                    Paragraph(miles_str, styles['GridText'])
+                ])
+                
+        if len(timeline_data) > 1:
+            timeline_table = Table(timeline_data, colWidths=[180, 340])
+            time_style = [
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8FAFC')),
+                ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#CBD5E1')),
+                ('GRID', (0,1), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+                ('PADDING', (0,0), (-1,-1), 8),
+            ]
+            for i in range(1, len(timeline_data)):
+                if i % 2 == 0:
+                    time_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#F8FAFC')))
+            timeline_table.setStyle(TableStyle(time_style))
+            story.append(timeline_table)
+        else:
+            history = [] # Fallback to no listings card
+            
+    if not history:
+        # Step 3: Beautiful, Soft-Blue Asset Status Box
+        info_content = [
+            [Paragraph("<b>NO HISTORICAL DEALER LISTINGS FOUND</b>", styles['InfoTitle'])],
+            [Paragraph("A search of dealer retail databases indicates that no listing records have been logged for this VIN. This is common and typical for vehicles that have been owned by a single private owner for their entire lifespan, or sold exclusively through private party transactions where retail inventory tracking systems do not scrape listings.", styles['GridText'])]
+        ]
+        info_table = Table(info_content, colWidths=[520])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#EFF6FF')), # Soft Blue
+            ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#3B82F6')), # Blue border
+            ('PADDING', (0,0), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        story.append(info_table)
         
-    timeline_table = Table(timeline_data, colWidths=[180, 340])
-    
-    time_style = [
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8FAFC')),
-        ('LINEBELOW', (0,0), (-1,0), 1, colors.HexColor('#CBD5E1')),
-        ('GRID', (0,1), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-        ('PADDING', (0,0), (-1,-1), 8),
-    ]
-    for i in range(1, len(timeline_data)):
-        if i % 2 == 0:
-            time_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#F8FAFC')))
-    timeline_table.setStyle(TableStyle(time_style))
-    story.append(timeline_table)
     story.append(PageBreak())
     
     # ------------------ PAGE 4: SAFETY RECALL DETAILS ------------------
