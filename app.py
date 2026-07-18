@@ -161,9 +161,9 @@ class PremiumVINReport(FPDF):
         self.set_auto_page_break(auto=False)
         self.set_margins(15, 15, 15)
         
-        # Color palette (GoodCar Inspired Green Theme blended with Luxury Navy)
-        self.c_navy = (13, 44, 84)        # #0D2C54
-        self.c_red = (227, 34, 34)        # #E32222
+        # Color palette (USA Patriotic Red, White, and Blue Theme)
+        self.c_navy = (10, 49, 97)        # Official US Flag Blue (#0A3161)
+        self.c_red = (179, 25, 44)        # Official US Flag Red (#B3192D)
         self.c_gold = (245, 180, 0)       # #F5B400
         self.c_green = (22, 163, 74)      # #16A34A
         self.c_dark = (31, 41, 55)        # #1F2937 (Text color)
@@ -196,15 +196,18 @@ class PremiumVINReport(FPDF):
         self.set_text_color(*self.c_dark)
         self.cell(0, 5, f"Report on {year} {make} {model}", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        # Horizontal divider line
-        self.set_draw_color(*self.c_border)
-        self.set_line_width(0.3)
-        self.line(15, 15, 195, 15)
+        # Horizontal divider line (USA themed blue & red stripes)
+        self.set_draw_color(10, 49, 97) # Flag Blue
+        self.set_line_width(0.5)
+        self.line(15, 14.5, 195, 14.5)
+        self.set_draw_color(179, 25, 44) # Flag Red
+        self.set_line_width(0.5)
+        self.line(15, 15.2, 195, 15.2)
         
-        # "VIN: {VIN}" (bold green) and "Search Date: {Date}" (dark text)
+        # "VIN: {VIN}" (bold USA blue) and "Search Date: {Date}" (dark text)
         self.set_y(17)
         self.set_font("Helvetica", "B", 9.5)
-        self.set_text_color(*self.c_green)
+        self.set_text_color(*self.c_navy)
         self.cell(100, 5, f"VIN: {self.target_vin}", align="L")
         
         self.set_font("Helvetica", "", 8.5)
@@ -463,10 +466,13 @@ class PremiumVINReport(FPDF):
             self.cell(40, 10, "VINreport", align="L")
             self.cell(0, 10, "", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        # Thin Divider
-        self.set_draw_color(*self.c_border)
-        self.set_line_width(0.3)
-        self.line(15, 25, 195, 25)
+        # Thin Divider (USA themed stripes)
+        self.set_draw_color(10, 49, 97) # Flag Blue
+        self.set_line_width(0.6)
+        self.line(15, 24.4, 195, 24.4)
+        self.set_draw_color(179, 25, 44) # Flag Red
+        self.set_line_width(0.6)
+        self.line(15, 25.4, 195, 25.4)
         
         # Title
         self.set_y(32)
