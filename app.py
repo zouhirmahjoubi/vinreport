@@ -231,7 +231,7 @@ class PremiumVINReport(FPDF):
         self.set_y(288)
         self.set_font("Helvetica", "", 5.5)
         self.set_text_color(*self.c_gray_text)
-        self.multi_cell(0, 3, "Disclaimer: The content of the NMVTIS Inquiry Data included in the report may have materially changed following this date.", align="C")
+        self.multi_cell(0, 3, "", align="C")
 
     # --- Drawing Helpers ---
     def draw_card(self, x, y, w, h, bg_color=None, border_color=None, radius=3, shadow=True):
@@ -450,7 +450,7 @@ class PremiumVINReport(FPDF):
         self.cell(40, 10, "VINreport", align="L")
         self.set_font("Helvetica", "B", 8)
         self.set_text_color(*self.c_gray_text)
-        self.cell(0, 10, "POWERED BY GOODCAR", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 10, "", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Thin Divider
         self.set_draw_color(*self.c_border)
