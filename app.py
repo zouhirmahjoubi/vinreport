@@ -304,12 +304,22 @@ def generate_pdf_report(vin, data, output_path):
     story.append(Spacer(1, 15))
     
     specs = data.get("specs", {})
-    year = specs.get("ModelYear", "N/A")
-    make = specs.get("Make", "N/A")
-    model = specs.get("Model", "N/A")
-    trim = specs.get("Trim", "")
+    
+    def clean_val(val):
+        if val is None:
+            return "N/A"
+        s = str(val).strip()
+        if s == "" or s.lower() in ("none", "null", "n/a"):
+            return "N/A"
+        return s
+
+    year = clean_val(specs.get("ModelYear"))
+    make = clean_val(specs.get("Make"))
+    model = clean_val(specs.get("Model"))
+    trim = specs.get("Trim")
+    trim_clean = clean_val(trim)
     full_name = f"{year} {make} {model}".upper()
-    sub_text = f"TRIM: {trim.upper()}" if trim else "SPECIFICATION CERTIFICATE"
+    sub_text = f"TRIM: {trim_clean.upper()}" if trim_clean != "N/A" else "SPECIFICATION CERTIFICATE"
     
     story.append(Paragraph(full_name, styles['MainTitle']))
     story.append(Paragraph(sub_text, styles['SubTitle']))
@@ -341,20 +351,43 @@ def generate_pdf_report(vin, data, output_path):
     story.append(d)
     story.append(Spacer(1, 20))
     
-    displacement = specs.get("DisplacementL") or specs.get("DisplacementCC", "")
-    disp_str = f"{displacement}L" if displacement else "N/A"
-    cylinders = specs.get("EngineCylinders", "")
-    cyl_str = f"I-{cylinders}" if specs.get("EngineConfiguration") == "In-Line" else f"V-{cylinders}" if cylinders else "N/A"
-    engine_desc = f"{disp_str} {cyl_str} {specs.get('EngineHP', '')}HP"
+    disp_val = clean_val(specs.get("DisplacementL"))
+    if disp_val == "N/A":
+        disp_val = clean_val(specs.get("DisplacementCC"))
+        if disp_val != "N/A":
+            disp_val = f"{disp_val} cc"
+    else:
+        disp_val = f"{disp_val}L"
+        
+    cyl_val = clean_val(specs.get("EngineCylinders"))
+    if cyl_val != "N/A":
+        config = clean_val(specs.get("EngineConfiguration"))
+        if config == "In-Line":
+            cyl_val = f"I-{cyl_val}"
+        elif config == "V-Engine" or "V" in config or config.startswith("V"):
+            cyl_val = f"V-{cyl_val}"
+        else:
+            cyl_val = f"{cyl_val}-Cylinder"
+            
+    hp_val = clean_val(specs.get("EngineHP"))
+    if hp_val != "N/A":
+        hp_val = f"{hp_val} HP"
+        
+    engine_parts = [p for p in [disp_val, cyl_val, hp_val] if p != "N/A"]
+    engine_desc = " / ".join(engine_parts) if engine_parts else "N/A"
     
-    origin = f"{specs.get('PlantCity', '')}, {specs.get('PlantState', '')}, {specs.get('PlantCountry', '')}".strip(', ') or "N/A"
+    city = clean_val(specs.get("PlantCity"))
+    state = clean_val(specs.get("PlantState"))
+    country = clean_val(specs.get("PlantCountry"))
+    origin_parts = [p for p in [city, state, country] if p != "N/A"]
+    origin = ", ".join(origin_parts) if origin_parts else "N/A"
     
     passport_specs = [
-        ("Body Class", specs.get("BodyClass", "N/A")),
+        ("Body Class", clean_val(specs.get("BodyClass"))),
         ("Engine", engine_desc),
-        ("Fuel Type", specs.get("FuelTypePrimary", "N/A")),
-        ("Drivetrain", specs.get("DriveType", "N/A")),
-        ("Transmission Style", specs.get("TransmissionStyle", "N/A")),
+        ("Fuel Type", clean_val(specs.get("FuelTypePrimary"))),
+        ("Drivetrain", clean_val(specs.get("DriveType"))),
+        ("Transmission Style", clean_val(specs.get("TransmissionStyle"))),
         ("Origin / Assembly Plant", origin),
     ]
     
@@ -379,15 +412,15 @@ def generate_pdf_report(vin, data, output_path):
     story.append(Spacer(1, 15))
     
     mech_specs = [
-        ("Engine Configuration", specs.get("EngineConfiguration", "N/A")),
-        ("Cylinders", specs.get("EngineCylinders", "N/A")),
-        ("Displacement (L)", specs.get("DisplacementL", "N/A")),
-        ("Horsepower", specs.get("EngineHP", "N/A")),
-        ("Valve Train Design", specs.get("ValveTrainDesign", "N/A")),
-        ("Transmission Style", specs.get("TransmissionStyle", "N/A")),
-        ("Wheel Size Front (in)", specs.get("WheelSizeFront", "N/A")),
-        ("Wheel Size Rear (in)", specs.get("WheelSizeRear", "N/A")),
-        ("Steering Location", specs.get("SteeringLocation", "N/A")),
+        ("Engine Configuration", clean_val(specs.get("EngineConfiguration"))),
+        ("Cylinders", clean_val(specs.get("EngineCylinders"))),
+        ("Displacement (L)", clean_val(specs.get("DisplacementL"))),
+        ("Horsepower", clean_val(specs.get("EngineHP"))),
+        ("Valve Train Design", clean_val(specs.get("ValveTrainDesign"))),
+        ("Transmission Style", clean_val(specs.get("TransmissionStyle"))),
+        ("Wheel Size Front (in)", clean_val(specs.get("WheelSizeFront"))),
+        ("Wheel Size Rear (in)", clean_val(specs.get("WheelSizeRear"))),
+        ("Steering Location", clean_val(specs.get("SteeringLocation"))),
     ]
     
     mech_table_data = [[Paragraph("<b>Mechanical Specification</b>", styles['TableCellBold']), ""]]
@@ -406,16 +439,16 @@ def generate_pdf_report(vin, data, output_path):
     ]))
     
     safety_specs = [
-        ("Antilock Brakes (ABS)", specs.get("ABS", "N/A")),
-        ("Stability Control (ESC)", specs.get("ESC", "N/A")),
-        ("Traction Control", specs.get("TractionControl", "N/A")),
-        ("Tire Pressure (TPMS)", specs.get("TPMS", "N/A")),
-        ("Front Airbags", specs.get("AirBagLocFront", "N/A")),
-        ("Side Airbags", specs.get("AirBagLocSide", "N/A")),
-        ("Curtain Airbags", specs.get("AirBagLocCurtain", "N/A")),
-        ("Forward Collision Warning", specs.get("ForwardCollisionWarning", "N/A")),
-        ("Lane Departure Warning", specs.get("LaneDepartureWarning", "N/A")),
-        ("Blind Spot Monitor", specs.get("BlindSpotMon", "N/A")),
+        ("Antilock Brakes (ABS)", clean_val(specs.get("ABS"))),
+        ("Stability Control (ESC)", clean_val(specs.get("ESC"))),
+        ("Traction Control", clean_val(specs.get("TractionControl"))),
+        ("Tire Pressure (TPMS)", clean_val(specs.get("TPMS"))),
+        ("Front Airbags", clean_val(specs.get("AirBagLocFront"))),
+        ("Side Airbags", clean_val(specs.get("AirBagLocSide"))),
+        ("Curtain Airbags", clean_val(specs.get("AirBagLocCurtain"))),
+        ("Forward Collision Warning", clean_val(specs.get("ForwardCollisionWarning"))),
+        ("Lane Departure Warning", clean_val(specs.get("LaneDepartureWarning"))),
+        ("Blind Spot Monitor", clean_val(specs.get("BlindSpotMon"))),
     ]
     
     safety_table_data = [[Paragraph("<b>Safety & Driver Assist</b>", styles['TableCellBold']), ""]]
