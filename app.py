@@ -323,13 +323,21 @@ class PremiumVINReport(FPDF):
 
     def draw_card_header(self, x, y, title, highlight_red=False, w=180):
         h = 7.5
-        self.set_fill_color(*self.c_light_green)
-        self.set_draw_color(*self.c_green)
+        if highlight_red:
+            self.set_fill_color(254, 226, 226) # USA Light Red
+            self.set_draw_color(179, 25, 44)   # USA Flag Red
+        else:
+            self.set_fill_color(219, 234, 254) # USA Light Blue
+            self.set_draw_color(10, 49, 97)    # USA Flag Blue
+            
         self.set_line_width(0.3)
         self.rect(x, y, w, h, style="FD", round_corners=True, corner_radius=3)
         
         self.set_font("Helvetica", "B", 9)
-        self.set_text_color(*self.c_navy)
+        if highlight_red:
+            self.set_text_color(179, 25, 44)   # Flag Red text
+        else:
+            self.set_text_color(10, 49, 97)    # Flag Blue text
         self.set_xy(x + 4, y + 1.8)
         self.cell(w - 8, 4, title)
 
