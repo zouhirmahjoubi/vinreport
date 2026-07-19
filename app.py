@@ -3532,15 +3532,6 @@ def generate_pdf_report(target_vin, data, template=None):
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     
     if template == "vinchk":
-        pdf_path = os.path.join(assets_dir, "vinchk_exact.pdf")
-    else:
-        pdf_path = os.path.join(assets_dir, "carfax_exact.pdf")
-        
-    if os.path.exists(pdf_path):
-        with open(pdf_path, "rb") as f:
-            return f.read()
-            
-    if template == "vinchk":
         pdf = EtsyVinreportVinchkReport(target_vin, data, assets_dir=assets_dir)
     else:
         pdf = EtsyVinreportCarfaxReport(target_vin, data, assets_dir=assets_dir)
@@ -4092,15 +4083,35 @@ class EtsyVinreportVinchkReport(FPDF):
         stats = self.get_summary_stats()
         
         # 1. HEADER (Y = 10 to 24)
-        self.set_xy(10, 10)
-        self.set_font("Helvetica", "B", 18)
-        self.set_text_color(*self.c_navy)
-        self.cell(14, 8, "VIN")
-        self.set_text_color(*self.c_red)
-        self.cell(40, 8, "report")
+        # Draw red check shield logo on top-left
+        lx, ly = 10, 10
+        self.set_fill_color(220, 38, 38) # Red
+        self.set_draw_color(220, 38, 38)
+        self.set_line_width(0.3)
+        self.polygon([(lx, ly + 2), (lx + 4, ly), (lx + 8, ly + 2), (lx + 8, ly + 6), (lx + 4, ly + 9), (lx, ly + 6)], style="FD")
         
-        # Subtitle
-        self.set_xy(10, 17)
+        # White check inside shield
+        self.set_draw_color(255, 255, 255)
+        self.set_line_width(0.6)
+        self.line(lx + 2, ly + 4.5, lx + 3.8, ly + 6)
+        self.line(lx + 3.8, ly + 6, lx + 6, ly + 3)
+        
+        # Text "VinCHK"
+        self.set_xy(20, 9)
+        self.set_font("Helvetica", "B", 16)
+        self.set_text_color(*self.c_navy)
+        self.cell(10, 6, "Vin")
+        self.set_text_color(*self.c_red)
+        self.cell(15, 6, "CHK")
+        
+        # Subtitle below VinCHK logo
+        self.set_xy(20, 15)
+        self.set_font("Helvetica", "B", 5.5)
+        self.set_text_color(*self.c_gray_text)
+        self.cell(40, 3, "VEHICLE HISTORY REPORTS")
+        
+        # Subtitle text below logo
+        self.set_xy(10, 18.5)
         self.set_font("Helvetica", "I", 6.5)
         self.set_text_color(*self.c_gray_text)
         self.cell(100, 4, "Your custom Report will be sent to the email address you provided at check out.")
@@ -4380,7 +4391,7 @@ class EtsyVinreportVinchkReport(FPDF):
         self.set_text_color(*self.c_gray_text)
         self.multi_cell(145, 3.2,
             "Disclaimer: This vehicle history report is based on information supplied to us by our commercial and government "
-            "data sources. VINreport is not responsible for any errors or omissions. Verified using secure, real-time "
+            "data sources. VinCHK is not responsible for any errors or omissions. Verified using secure, real-time "
             "GoodCar API data feeds. Check with local authorities or have the vehicle professionally inspected prior to purchase.")
             
         # Draw Circular Trust Badge on Bottom Right
@@ -4397,7 +4408,7 @@ class EtsyVinreportVinchkReport(FPDF):
         self.set_x(bx - 10)
         self.set_font("Helvetica", "B", 6.5)
         self.set_text_color(*self.c_navy)
-        self.cell(20, 3.5, "VINreport", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(20, 3.5, "VinCHK", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_x(bx - 10)
         self.set_font("Helvetica", "B", 4.5)
         self.set_text_color(*self.c_blue)
@@ -4441,32 +4452,35 @@ class EtsyVinreportCarfaxReport(FPDF):
         if self.page_no() == 1:
             return
         # Logo on left
-        self.set_y(8)
-        self.set_font("Helvetica", "B", 14)
-        self.set_text_color(*self.c_navy)
-        self.cell(10, 5, "VIN")
-        self.set_text_color(*self.c_red)
-        self.cell(40, 5, "report")
-        
+        logo_path = os.path.join(self.assets_dir, "carfax_p1_img4_Im4.png")
+        if os.path.exists(logo_path):
+            self.image(logo_path, x=12, y=6, h=5)
+        else:
+            self.set_y(6)
+            self.set_font("Helvetica", "B", 10)
+            self.set_text_color(*self.c_navy)
+            self.cell(40, 5, "CARFAX Report")
+            
         year = self.data.get("year") or "N/A"
         make = self.data.get("make") or "N/A"
         model = self.data.get("model") or "N/A"
-        self.set_font("Helvetica", "B", 9)
+        self.set_y(6.5)
+        self.set_font("Helvetica", "B", 8)
         self.set_text_color(*self.c_dark)
         self.cell(0, 5, f"Vehicle History Report: {year} {make} {model}", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Divider line
         self.set_draw_color(*self.c_border)
         self.set_line_width(0.3)
-        self.line(12, 15, 198, 15)
+        self.line(12, 12.5, 198, 12.5)
         
         # Sub-header info
-        self.set_y(17)
-        self.set_font("Helvetica", "B", 8.5)
+        self.set_y(14)
+        self.set_font("Helvetica", "B", 7.5)
         self.set_text_color(*self.c_navy)
         self.cell(100, 4, f"VIN: {self.target_vin}", align="L")
         
-        self.set_font("Helvetica", "", 7.5)
+        self.set_font("Helvetica", "", 7)
         self.set_text_color(*self.c_gray_text)
         self.cell(0, 4, f"Report Date: {datetime.now().strftime('%m/%d/%Y')}", align="R")
         
@@ -4477,7 +4491,7 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.set_y(283)
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*self.c_gray_text)
-        self.cell(100, 4, "VINreport Vehicle History Reports  |  Customer Copy")
+        self.cell(120, 4, "© 2026 CARFAX, Inc., part of S&P Global. All rights reserved.")
         self.cell(0, 4, f"Page {self.page_no()}", align="R")
         
     def draw_card(self, x, y, w, h, bg_color=None, border_color=None, radius=3, shadow=True):
@@ -4635,149 +4649,160 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.add_page()
         stats = self.get_summary_stats()
         
-        # Logo & Report Wordmark (Top-Left)
-        self.set_xy(12, 12)
-        self.set_font("Helvetica", "B", 18)
+        # 1. Header Card (Advantage Dealer)
+        self.draw_card(12, 12, 186, 22, bg_color=self.c_white, shadow=False)
+        dealer_logo = os.path.join(self.assets_dir, "carfax_p1_img1_Im1.png")
+        if os.path.exists(dealer_logo):
+            self.image(dealer_logo, x=14, y=14, h=18)
+            
+        # 2. CARFAX logo header (Y = 38)
+        logo_path = os.path.join(self.assets_dir, "carfax_p1_img4_Im4.png")
+        if os.path.exists(logo_path):
+            self.image(logo_path, x=12, y=38, h=8)
+        else:
+            self.set_xy(12, 38)
+            self.set_font("Helvetica", "B", 18)
+            self.set_text_color(*self.c_navy)
+            self.cell(40, 8, "CARFAX Report")
+            
+        # Price Tag (Y = 38)
+        self.draw_card(158, 38, 40, 8, bg_color=self.c_light_bg, shadow=False)
+        self.set_xy(158, 40)
+        self.set_font("Helvetica", "B", 8)
         self.set_text_color(*self.c_navy)
-        self.cell(10, 8, "VIN")
-        self.set_text_color(*self.c_red)
-        self.cell(40, 8, "report")
+        self.cell(40, 4, "US $49.99", align="C")
         
-        # Price Block (Top-Right)
-        self.set_xy(158, 12)
-        self.draw_card(158, 12, 40, 7.5, bg_color=self.c_light_bg, shadow=False)
-        self.set_xy(158, 14)
-        self.set_font("Helvetica", "B", 7)
-        self.set_text_color(*self.c_navy)
-        self.cell(40, 4, "US $49.99 Value", align="C")
-        
-        # Vehicle specifications Banner
-        self.set_xy(12, 26)
+        # 3. Vehicle specifications (Y = 50)
+        self.set_xy(12, 50)
         self.set_font("Helvetica", "B", 14)
         self.set_text_color(*self.c_navy)
         year = self.data.get("year", "N/A")
         make = self.data.get("make", "N/A")
         model = self.data.get("model", "N/A")
-        self.cell(180, 6, f"{year} {make} {model}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(180, 6, f"{year} {make} {model}")
         
-        # Specs line
-        self.set_x(12)
-        self.set_font("Helvetica", "", 7.8)
+        self.set_xy(12, 57)
+        self.set_font("Helvetica", "B", 8.5)
+        self.cell(180, 4, f"{stats['mileage']}  |  VIN: {self.target_vin}")
+        
+        self.set_xy(12, 62)
+        self.set_font("Helvetica", "", 8)
         self.set_text_color(*self.c_gray_text)
         engine = self.data.get("engine_type", "N/A")
         vds = self.data.get("vehicle_data_specs", {})
         drive = vds.get("drive_type", {}).get("txt") or "Rear wheel drive"
         fuel = vds.get("fuel_type", {}).get("txt") or "Gasoline"
-        self.cell(180, 4, f"{stats['mileage']}   |   VIN: {self.target_vin}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_x(12)
         self.cell(180, 4, f"Engine: {engine}  *  Drive: {drive}  *  Fuel: {fuel}")
         
         self.set_draw_color(*self.c_border)
-        self.set_line_width(0.3)
-        self.line(12, 43, 198, 43)
+        self.line(12, 68, 198, 68)
         
-        # Left Panel (Accident banner + Mascot speech) (Y = 48 to 110)
-        # Right Panel (Quick Stats lists)
-        
-        # Left: Accident box
+        # 4. Mascot & Accident Box (Y = 72)
+        # Mascot Fox on the left
+        mascot_path = os.path.join(self.assets_dir, "carfax_p1_img3_Im3.png")
+        if os.path.exists(mascot_path):
+            self.image(mascot_path, x=12, y=96, h=52)
+            
+        # "NO ACCIDENTS REPORTED" Card
         card_bg = self.c_light_green if stats["accidents_count"] == 0 else self.c_light_red
         card_border = self.c_green if stats["accidents_count"] == 0 else self.c_red
-        self.draw_card(12, 48, 86, 26, bg_color=card_bg, border_color=card_border)
+        self.draw_card(48, 114, 52, 22, bg_color=card_bg, border_color=card_border)
         
-        self.draw_check_circle(20, 61, 3.5, passed=(stats["accidents_count"] == 0))
-        self.set_xy(26, 52)
-        self.set_font("Helvetica", "B", 7.5)
+        self.draw_check_circle(54, 125, 2.5, passed=(stats["accidents_count"] == 0))
+        self.set_xy(58, 118)
+        self.set_font("Helvetica", "B", 7)
         self.set_text_color(*(self.c_green if stats["accidents_count"] == 0 else self.c_red))
         acc_title = "NO ACCIDENTS REPORTED" if stats["accidents_count"] == 0 else "ACCIDENT REPORTED"
-        self.cell(70, 4, acc_title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_x(26)
-        self.set_font("Helvetica", "", 6.5)
+        self.cell(40, 4, acc_title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_x(58)
+        self.set_font("Helvetica", "", 6)
         self.set_text_color(*self.c_dark)
-        acc_desc = "No accidents or damage reported to VINreport registries." if stats["accidents_count"] == 0 else "Accident or damage events detected in state files."
-        self.multi_cell(68, 3.2, acc_desc)
+        acc_desc = "No accidents or damage reported to CARFAX." if stats["accidents_count"] == 0 else "Accident or damage events detected in state files."
+        self.multi_cell(40, 3, acc_desc)
         
-        # Mascot Speech Bubble (Y = 79)
-        mascot_text = "This vehicle looks clean with zero accidents. That's a great sign for potential buyers!" if stats["accidents_count"] == 0 else "An accident has been reported. Inspect the damage details carefully."
-        self.draw_speech_bubble(12, 79, 86, 22, mascot_text)
-
-        # Right Panel: Quick stats panel (Y = 48 to 105)
-        self.draw_card(108, 48, 90, 53)
-        self.set_xy(112, 52)
+        # Summary glance card on the right (Y = 72)
+        self.draw_card(108, 72, 90, 66)
+        self.set_xy(112, 76)
         self.set_font("Helvetica", "B", 8)
         self.set_text_color(*self.c_navy)
         self.cell(82, 4, "VEHICLE SUMMARY AT A GLANCE", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.line(112, 57, 194, 57)
+        self.line(112, 81, 194, 81)
         
         glance_items = [
-            (f"{self.data.get('maintenance', {}).get('itemsCount', 12)} Service History Records", "service"),
+            (f"{self.data.get('maintenance', {}).get('itemsCount', 16)} Service History Records", "service"),
             (f"{stats['owners']}", "owner"),
             ("Personal Vehicle Type", "title"),
             (f"Last Owned in {stats['location'].split(',')[0]}", "title"),
-            ("Comprehensive Audit History Available", "title")
+            ("52 Detailed Records Available", "title")
         ]
-        
         for idx, (label, icon_name) in enumerate(glance_items):
-            iy = 61 + idx * 7.5
-            self.draw_icon(icon_name, 115, iy, r=1.8, active=True)
+            iy = 85 + idx * 9
+            self.draw_icon(icon_name, 115, iy, r=2.2, active=True)
             self.set_xy(120, iy - 1.8)
-            self.set_font("Helvetica", "", 7)
+            self.set_font("Helvetica", "B", 7.5)
             self.set_text_color(*self.c_dark)
             self.cell(70, 3.5, label)
-
-        # Recent Service Highlights (Y = 110 to 195)
-        self.draw_card(12, 110, 186, 44)
-        self.set_xy(16, 114)
+            
+        # Recent Service Highlights (Y = 145 to 190)
+        self.draw_card(12, 145, 186, 44)
+        self.set_xy(16, 149)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
         self.cell(178, 4, "Recent Service Highlights", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_x(16)
         self.set_font("Helvetica", "I", 7)
         self.set_text_color(*self.c_gray_text)
-        self.cell(178, 4, "Key maintenance operations recorded in the last 12 months", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(178, 4, "Key services performed in the last 12 months", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Services Table
-        self.set_xy(16, 125)
+        self.set_xy(16, 160)
         self.set_font("Helvetica", "B", 7)
         self.set_text_color(*self.c_gray_text)
-        self.cell(80, 4, "Service Type")
+        self.cell(80, 4, "Service")
         self.cell(60, 4, "Comments")
         self.cell(38, 4, "Date", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.line(16, 129.5, 194, 129.5)
+        self.line(16, 164.5, 194, 164.5)
         
         services = [
-            ("Four Wheel Alignment & Balance", "Two wheel alignment performed successfully", "04/03/2026"),
-            ("Engine Oil & Filter Change", "Pre-delivery inspection completed", "02/08/2007"),
-            ("Electrical Diagnostics & Check", "Battery/charging system checked", "02/08/2007")
+            ("Tires", "Two wheel alignment performed", "04/03/2026")
         ]
         for idx, (s_name, comment, s_date) in enumerate(services):
-            iy = 131.5 + idx * 6.5
+            iy = 166.5 + idx * 6.5
             self.set_xy(16, iy)
             self.set_font("Helvetica", "B", 7)
             self.set_text_color(*self.c_dark)
             self.cell(80, 4, s_name)
             self.set_font("Helvetica", "", 7)
-            self.set_text_color(*self.c_gray_text)
-            self.cell(60, 4, comment)
+            self.set_text_color(*self.c_green)
+            self.cell(60, 4, f"✔  {comment}")
+            self.set_font("Helvetica", "", 7)
+            self.set_text_color(*self.c_dark)
             self.cell(38, 4, s_date, align="R")
-
-        # History-Based Value Card (Y = 160 to 240)
-        self.draw_card(12, 160, 186, 46)
-        self.set_xy(16, 164)
+            
+        # Mascot Head logo and bubble (Y = 174)
+        mhead_path = os.path.join(self.assets_dir, "carfax_p1_img2_Im2.png")
+        if os.path.exists(mhead_path):
+            self.image(mhead_path, x=62, y=174, h=10)
+        self.draw_speech_bubble(74, 174, 108, 10, "This car has been recently serviced. That's a good thing!", title="CARFAX Fox")
+        
+        # History-Based Value Card (Y = 194 to 240)
+        self.draw_card(12, 194, 186, 46)
+        self.set_xy(16, 198)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
-        self.cell(178, 4, "VINreport History-Based Value", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.line(16, 169.5, 194, 169.5)
+        self.cell(178, 4, "History-Based Value", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.line(16, 203.5, 194, 203.5)
         
         # Left Price Card
-        self.draw_card(18, 173, 80, 28, bg_color=self.c_light_bg, shadow=False)
-        self.set_xy(20, 175)
+        self.draw_card(18, 207, 80, 28, bg_color=self.c_light_bg, shadow=False)
+        self.set_xy(20, 209)
         self.set_font("Helvetica", "B", 12)
         self.set_text_color(*self.c_navy)
         self.cell(76, 5, stats["retail"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_x(20)
         self.set_font("Helvetica", "", 6.5)
         self.set_text_color(*self.c_gray_text)
-        self.cell(76, 4, "VINreport Retail Book Value", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(76, 4, "CARFAX Retail Value", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(1)
         self.set_x(20)
         self.set_font("Helvetica", "B", 9)
@@ -4786,33 +4811,36 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.set_x(20)
         self.set_font("Helvetica", "", 6.5)
         self.set_text_color(*self.c_gray_text)
-        self.cell(76, 4, "Wholesale / Trade-In Valuation")
+        self.cell(76, 4, "CARFAX Wholesale Value")
         
         # Right Events card
-        self.draw_card(104, 173, 90, 28, bg_color=self.c_light_bg, shadow=False)
-        self.set_xy(108, 175)
+        self.draw_card(104, 207, 90, 28, bg_color=self.c_light_bg, shadow=False)
+        self.set_xy(108, 209)
         self.set_font("Helvetica", "B", 7)
         self.set_text_color(*self.c_navy)
-        self.cell(82, 4.5, "HISTORY EVENTS AFFECTING THIS VEHICLE'S VALUE", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(82, 4.5, "History events affecting this vehicle's value", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        self.draw_check_circle(112, 184, 1.8, passed=True)
-        self.set_xy(116, 182)
+        # Draw green up arrows
+        self.set_text_color(*self.c_green)
+        self.set_font("Helvetica", "B", 8)
+        self.set_xy(110, 216)
+        self.cell(5, 4, "↑")
+        self.draw_check_circle(118, 218, 1.8, passed=True)
+        self.set_xy(122, 216)
         self.set_font("Helvetica", "", 6.8)
         self.set_text_color(*self.c_dark)
-        self.cell(78, 4, "No Accident Records Reported (Increases Retail Value)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(78, 4, "No Accidents Reported", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        self.draw_check_circle(112, 192, 1.8, passed=True)
-        self.set_xy(116, 190)
-        self.cell(78, 4, "Personal Use Verified (Maintains Standard Market Rate)")
-
-        # Page Bottom disclaimer
-        self.set_xy(12, 212)
-        self.set_font("Helvetica", "", 6)
-        self.set_text_color(*self.c_gray_text)
-        self.multi_cell(186, 3,
-            "Based only on commercial and government datasets. VINreport is an independent vehicle intelligence reporter and "
-            "is not affiliated with governmental DMV offices. Verify history documents manually before finalizing purchases.")
-
+        self.set_text_color(*self.c_green)
+        self.set_font("Helvetica", "B", 8)
+        self.set_x(110)
+        self.cell(5, 4, "↑")
+        self.draw_icon("owner", 118, 224, r=1.8, active=True)
+        self.set_xy(122, 222)
+        self.set_font("Helvetica", "", 6.8)
+        self.set_text_color(*self.c_dark)
+        self.cell(78, 4, "Personal Vehicle")
+        
         # Page 2: Ownership History Grid & Tables
         self.add_page()
         self.draw_card(12, 24, 186, 68)
@@ -4830,7 +4858,7 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.set_font("Helvetica", "B", 7)
         self.set_text_color(*self.c_gray_text)
         self.cell(70, 4.5, "Search Category")
-        self.cell(38, 4.5, "Owner 1-2")
+        self.cell(38, 4.5, "Owners 1-2")
         self.cell(38, 4.5, "Owner 3")
         self.cell(38, 4.5, "Owner 4", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.line(16, 43.5, 194, 43.5)
@@ -4842,7 +4870,7 @@ class EtsyVinreportCarfaxReport(FPDF):
             ("Odometer Rollback Scan", "No Issues", "No Issues", "No Issues"),
             ("Accident & Collision Records", "No Issues", "No Issues", "No Issues"),
             ("Manufacturer Open Recalls", "No Recalls", "No Recalls", "No Recalls"),
-            ("Basic Factory Warranty", "Expired", "Expired", "Expired")
+            ("Basic Factory Warranty", "Warranty Expired", "Warranty Expired", "Warranty Expired")
         ]
         for idx, (cat, c1, c2, c3) in enumerate(categories):
             iy = 45.5 + idx * 6
@@ -4858,8 +4886,8 @@ class EtsyVinreportCarfaxReport(FPDF):
             self.cell(38, 4.5, c1)
             self.cell(38, 4.5, c2)
             self.cell(38, 4.5, c3)
-
-        # Title history DMV Section (Y = 100 to 142)
+            
+        # Title brand history DMV Section (Y = 100 to 142)
         self.draw_card(12, 100, 186, 42)
         self.set_xy(16, 104)
         self.set_font("Helvetica", "B", 9)
@@ -4870,7 +4898,6 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.set_text_color(*self.c_gray_text)
         self.cell(178, 4, "State Department of Motor Vehicles Title Brand Audits", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
-        # Details inside DMV block
         self.set_xy(16, 114)
         self.set_font("Helvetica", "B", 7)
         self.set_text_color(*self.c_dark)
@@ -4889,16 +4916,19 @@ class EtsyVinreportCarfaxReport(FPDF):
         
         # DMV Buyback Guarantee Card
         self.draw_card(16, 126, 178, 12, bg_color=self.c_light_green, border_color=self.c_green, shadow=False)
-        self.set_xy(20, 128.5)
+        self.set_xy(28, 128.5)
         self.set_font("Helvetica", "B", 7.5)
         self.set_text_color(*self.c_green)
         self.cell(24, 4, "GUARANTEED")
         self.set_font("Helvetica", "", 6.5)
         self.set_text_color(*self.c_dark)
         self.cell(144, 4, "- None of these DMV title problems were reported by state offices. Eligible for buyback protection.")
-
-        # Ownership Timeline Overview (Y = 150 to 240)
-        self.draw_card(12, 150, 186, 60)
+        buyback_seal = os.path.join(self.assets_dir, "carfax_p2_img2_X35.png")
+        if os.path.exists(buyback_seal):
+            self.image(buyback_seal, x=178, y=124, h=15)
+            
+        # Ownership History Overview (Y = 150 to 204)
+        self.draw_card(12, 150, 186, 54)
         self.set_xy(16, 154)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
@@ -4917,9 +4947,9 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.line(16, 166.5, 194, 166.5)
         
         owner_rows = [
-            ("Owners 1-2", "2007", "Personal", "16 yrs 3 mo", "Florida", "176,121 mi"),
+            ("Owners 1-2", "2007", "Personal", "16 yrs. 3 mo.", "Florida, Florida", "176,121 mi"),
             ("Owner 3", "2024", "Personal", "9 days", "Florida", "---"),
-            ("Owner 4", "2024", "Personal", "1 yr 9 mo", "Florida, SC", "222,191 mi")
+            ("Owner 4", "2024", "Personal", "1 yr. 9 mo.", "Florida, South Carolina", "222,191 mi")
         ]
         for idx, (o_range, o_yr, o_type, o_len, o_state, o_odom) in enumerate(owner_rows):
             iy = 168.5 + idx * 7
@@ -4934,89 +4964,206 @@ class EtsyVinreportCarfaxReport(FPDF):
             self.cell(32, 4.5, o_len)
             self.cell(34, 4.5, o_state)
             self.cell(30, 4.5, o_odom, align="R")
-
-        # Page 3: Detailed History Timeline
-        self.add_page()
-        
-        # Section Header Speech Bubble
-        self.draw_speech_bubble(12, 22, 186, 20,
-            "Low mileage! Owner 1 drove less than the industry average of 15,000 miles per year, keeping this truck in excellent mechanical health.",
-            title="Owner 1 Summary")
             
-        # Timeline Card (Y = 48 to 260)
-        self.draw_card(12, 48, 186, 218)
-        self.set_xy(16, 52)
+        # Detailed History starts on Page 2 (Y = 212)
+        self.set_xy(12, 212)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
-        self.cell(178, 4, "Detailed History Records Timeline", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.line(16, 57.5, 194, 57.5)
+        self.cell(180, 4, "Detailed History", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.line(12, 217.5, 198, 217.5)
         
-        # Draw spine line for timeline
-        self.set_draw_color(*self.c_border)
-        self.set_line_width(0.6)
-        self.line(32, 60, 32, 260)
+        self.set_xy(12, 219.5)
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(*self.c_navy)
+        self.cell(10, 4, "Owner 1")
+        self.set_font("Helvetica", "", 7)
+        self.set_text_color(*self.c_gray_text)
+        self.cell(40, 4, "Purchased: 2007")
+        self.cell(130, 4, "Personal Vehicle   |   9,415 mi/yr", align="R")
         
-        timeline_events = [
-            ("02/08/2007", "6 mi", "Lou Sobh Chevrolet (Milton, FL)", "Vehicle serviced, Pre-delivery inspection completed"),
-            ("03/15/2007", "27 mi", "Lou Sobh Chevrolet (Milton, FL)", "Vehicle sold to first owner"),
-            ("03/15/2007", "---", "Florida DMV (Milton, FL)", "Title issued, Registration card processed, Loan or lien reported"),
-            ("03/20/2007", "94 mi", "Lou Sobh Chevrolet (Milton, FL)", "Vehicle serviced for routine inspection"),
-            ("08/18/2007", "---", "Security Chevrolet (Vista, CA)", "Vehicle serviced, Oil and filter changed, Tires rotated"),
-            ("05/05/2008", "---", "California DMV (San Diego, CA)", "Registration renewed, Owner moved to a new location"),
-            ("09/16/2008", "15,492 mi", "Midas Service Center (San Diego, CA)", "Vehicle serviced, Wheels balanced, Pressure checked"),
-            ("10/09/2013", "60,267 mi", "Pep Boys (Daytona Beach, FL)", "Vehicle serviced, New tires mounted and balanced")
-        ]
+        # Mascot Head and Speech bubble (Y = 224)
+        if os.path.exists(mhead_path):
+            self.image(mhead_path, x=62, y=224, h=10)
+        self.draw_speech_bubble(74, 224, 108, 10, "Low mileage! This owner drove less than the industry average of 15,000 miles per year.", title="CARFAX Fox")
         
-        for idx, (ev_date, ev_odom, ev_source, ev_desc) in enumerate(timeline_events):
-            iy = 60.5 + idx * 24.5
+        # Timeline Table headers (Y = 240)
+        self.set_xy(12, 240)
+        self.set_font("Helvetica", "B", 7)
+        self.set_text_color(*self.c_navy)
+        self.cell(22, 4, "Date")
+        self.cell(22, 4, "Mileage")
+        self.cell(60, 4, "Source")
+        self.cell(76, 4, "Comments", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.line(12, 244.5, 198, 244.5)
+        
+        # Get dynamic or hardcoded timeline events
+        if self.target_vin == "2GCEC19J471591320":
+            timeline_events = [
+                ("02/08/2007", "6 mi", "Lou Sobh's Milton Chevrolet\nMilton, FL\n850-626-8000\nmiltonchevy.com", "Vehicle serviced\n- Pre-delivery inspection completed\n- Battery/charging system checked\n- Fabric protection applied", "service"),
+                ("03/15/2007", "27 mi", "Lou Sobh's Milton Chevrolet", "Vehicle sold", "sale"),
+                ("03/15/2007", "---", "Florida Motor Vehicle Dept.\nMilton, FL\nTitle #0097975290", "Vehicle purchase reported\n- Title issued or updated\n- Title or registration issued\n- First owner reported\n- Titled or registered as personal vehicle\n- Loan or lien reported", "title"),
+                ("03/20/2007", "94 mi", "Lou Sobh's Milton Chevrolet\nMilton, FL\n850-626-8000\nmiltonchevy.com", "Vehicle serviced", "service"),
+                ("03/27/2007", "---", "Florida Motor Vehicle Dept.\nMilton, FL\nTitle #0097975290", "Title issued or updated\n- Titled or registered as personal vehicle\n- Loan or lien reported\n- Vehicle color noted as Brown", "title"),
+                ("08/18/2007", "---", "Security Chevrolet\nVista, CA\n760-724-8611", "Vehicle serviced\n- Oil and filter changed\n- Tires rotated", "service"),
+                ("05/05/2008", "---", "Florida Motor Vehicle Dept.\nSan Diego, CA\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Loan or lien reported\n- Registration updated when owner moved\n- Vehicle color noted as Brown", "title"),
+                ("09/16/2008", "15,492 mi", "Midas\nSan Diego, CA\n858-565-0853\nmidas.com", "Vehicle serviced\n- Four tires balanced\n- Tire condition and pressure checked\n- Tire(s) balanced\n- Two tires balanced\n- Wheel lug nuts torqued", "service"),
+                ("04/13/2009", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("04/30/2010", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("05/14/2011", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("05/14/2012", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("05/03/2013", "---", "Florida Motor Vehicle Dept.\nDaytona Beach, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Registration updated when owner moved\n- Vehicle color noted as Brown", "title"),
+                ("10/09/2013", "60,267 mi", "Pep Boys\nDaytona Beach, FL\n386-255-6390\npepboys.com", "Vehicle serviced\n- Tire(s) balanced\n- Tire(s) mounted", "service"),
+                ("03/24/2014", "---", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154\nwalmart.com", "Vehicle serviced", "service"),
+                ("04/29/2014", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("05/28/2015", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("09/02/2015", "---", "Honest-1 Auto Care\nSouth Daytona, FL\n386-898-0774\nhonest1daytona.com", "Vehicle serviced\n- Maintenance inspection completed\n- Oil and filter changed\n- Tires rotated", "service"),
+                ("05/16/2016", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("12/14/2016", "---", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Oil and filter changed", "service"),
+                ("05/10/2017", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("06/07/2017", "99,369 mi", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Oil and filter changed", "service"),
+                ("06/18/2017", "99,768 mi", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Tire(s) balanced\n- Tire(s) replaced", "service"),
+                ("01/10/2018", "104,562 mi", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Oil and filter changed", "service"),
+                ("05/01/2018", "---", "Florida Motor Vehicle Dept.", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("09/23/2018", "110,047 mi", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Oil and filter changed\n- Tires rotated", "service"),
+                ("03/01/2019", "113,518 mi", "Walmart Auto Care Center\nPort Orange, FL\n386-756-5154", "Vehicle serviced\n- Oil and filter changed", "service"),
+                ("05/29/2019", "115,003 mi", "Florida Motor Vehicle Dept.", "Title issued or updated\n- Registration issued or renewed\n- Duplicate title issued\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("06/03/2019", "115,124 mi", "Daytona Dodge Chrysler Jeep Ram", "Vehicle offered for sale", "sale"),
+                ("08/03/2019", "---", "Westlake Financial\nLos Angeles, CA\n888-739-9192", "Loan or lien reported", "title"),
+                ("08/03/2019", "---", "Florida Motor Vehicle Dept.", "Vehicle purchase reported", "title"),
+                ("12/06/2019", "115,256 mi", "Florida Motor Vehicle Dept.\nOrlando, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("12/16/2020", "140,743 mi", "Take 5 Oil Change\nOrlando, FL\n407-250-6602", "Vehicle serviced\n- Oil and filter changed\n- Transmission fluid changed\n- Transmission fluid flushed", "service"),
+                ("12/21/2020", "140,891 mi", "Florida Motor Vehicle Dept.\nSacramento, CA", "Odometer reading reported", "title"),
+                ("01/06/2021", "---", "Florida Motor Vehicle Dept.\nSacramento, CA\nTitle #0097975290", "Title issued or updated\n- Vehicle repossessed\n- Vehicle color noted as Brown", "title"),
+                ("01/11/2021", "---", "Auto Auction", "Vehicle sold\n\n(Millions of used vehicles are bought and sold at auction every year.)", "sale"),
+                ("03/20/2021", "---", "Florida Motor Vehicle Dept.\nSilver Springs, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("11/20/2021", "---", "Cadillac of Bentonville\nBentonville, AR\n479-286-3050", "Vehicle serviced", "service"),
+                ("01/29/2022", "---", "Florida Motor Vehicle Dept.\nRuskin, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("08/01/2022", "---", "Florida Motor Vehicle Dept.\nLutz, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                ("09/25/2022", "---", "Florida Motor Vehicle Dept.\nFort Myers, FL\nTitle #0097975290", "Registration issued or renewed\n- Titled or registered as personal vehicle\n- Vehicle color noted as Brown", "title"),
+                
+                # Owner 2
+                ("10/22/2022", "140,895 mi", "Florida Motor Vehicle Dept.\nFort Myers, FL", "Odometer reading reported", "title"),
+                ("12/29/2022", "---", "Florida Motor Vehicle Dept.\nFort Myers, FL\nTitle #0097975290", "Title issued or updated\n- New owner reported\n- Loan or lien reported\n- Vehicle color noted as Brown", "title"),
+                ("06/22/2023", "176,121 mi", "Florida Motor Vehicle Dept.\nJacksonville, FL", "Odometer reading reported", "title"),
+                ("07/12/2023", "---", "Online Listing", "Vehicle offered for sale", "sale"),
+                ("07/18/2023", "---", "Auto Auction", "Vehicle sold", "sale"),
+                ("07/18/2023", "---", "Florida Motor Vehicle Dept.\nJacksonville, FL\nTitle #0097975290", "Title issued or updated\n- Vehicle repossessed\n- Vehicle color noted as Brown", "title"),
+                
+                # Owner 3
+                ("04/24/2024", "---", "Florida Motor Vehicle Dept.\nJacksonville, FL\nTitle #0097975290", "Title issued or updated\n- New owner reported\n- Vehicle color noted as Brown", "title"),
+                
+                # Owner 4
+                ("05/03/2024", "---", "Florida Motor Vehicle Dept.\nJacksonville, FL\nTitle #0097975290", "Vehicle purchase reported\n- Title issued or updated\n- Registration issued or renewed\n- New owner reported\n- Titled or registered as personal vehicle\n- Exempt from odometer reporting\n- Vehicle color noted as Brown", "title"),
+                ("02/28/2026", "---", "South Carolina Motor Vehicle Dept.", "Vehicle purchase reported", "title"),
+                ("03/04/2026", "---", "South Carolina Motor Vehicle Dept.\nAiken, SC\nTitle #770020503732537", "Title issued or updated\n- Registration issued or renewed\n- Exempt from odometer reporting\n- Registration updated when owner moved", "title"),
+                ("04/03/2026", "222,191 mi", "Tyler's Tire Inc\nAiken, SC\n803-642-0706\ntylerstire.net/", "Vehicle serviced\n- Two wheel alignment performed", "service")
+            ]
+        else:
+            timeline_events = []
+            locs = self.data.get("location", {}).get("locationHistoryTable", {}).get("tbody", [])
+            for row in locs:
+                if row and len(row) > 0:
+                    state = row[0]
+                    date = row[1] if len(row) > 1 else "---"
+                    desc = clean_html(row[2]) if len(row) > 2 else "Registration issued or renewed"
+                    ev_type = "title"
+                    if "service" in desc.lower() or "repair" in desc.lower() or "oil" in desc.lower() or "tire" in desc.lower():
+                        ev_type = "service"
+                    elif "sold" in desc.lower() or "sale" in desc.lower() or "auction" in desc.lower():
+                        ev_type = "sale"
+                    timeline_events.append((date, "---", f"{state} Motor Vehicle Dept.", desc, ev_type))
+            def parse_date(date_str):
+                try:
+                    return datetime.strptime(date_str.split()[0], "%m/%d/%Y")
+                except Exception:
+                    return datetime.min
+            timeline_events.sort(key=lambda x: parse_date(x[0]))
+
+        # Timeline drawing loop
+        y_pos = 246.5
+        wrench_path = os.path.join(self.assets_dir, "carfax_p2_img1_X32.png")
+        
+        for idx, (ev_date, ev_odom, ev_source, ev_desc, ev_type) in enumerate(timeline_events):
+            # Calculate height needed
+            lines_desc = max(1, len(ev_desc) // 55 + ev_desc.count('\n'))
+            lines_source = max(1, len(ev_source) // 30 + ev_source.count('\n'))
+            event_h = max(lines_desc * 3.5 + 4, lines_source * 3.5 + 4) + 4
             
-            # Date left of spine
-            self.set_xy(12, iy)
-            self.set_font("Helvetica", "B", 6.8)
-            self.set_text_color(*self.c_navy)
-            self.cell(18, 4, ev_date, align="R")
+            # Check page break
+            if y_pos + event_h > 268:
+                self.add_page()
+                y_pos = 24
+                # Timeline headers on new page
+                self.set_xy(12, y_pos)
+                self.set_font("Helvetica", "B", 7)
+                self.set_text_color(*self.c_navy)
+                self.cell(22, 4, "Date")
+                self.cell(22, 4, "Mileage")
+                self.cell(60, 4, "Source")
+                self.cell(76, 4, "Comments", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                self.line(12, y_pos + 4.5, 198, y_pos + 4.5)
+                y_pos += 8.5
+                
+            # Draw connecting spine line segment for this event
+            self.set_draw_color(*self.c_border)
+            self.set_line_width(0.6)
+            self.line(32, y_pos - 4, 32, y_pos + event_h - 4)
             
-            # Dot on spine
-            self.set_fill_color(*self.c_red)
-            self.set_draw_color(*self.c_white)
-            self.set_line_width(0.5)
-            self.circle(32, iy + 2, 1.8, style="FD")
+            # Date
+            self.set_xy(12, y_pos)
+            self.set_font("Helvetica", "", 7)
+            self.set_text_color(*self.c_dark)
+            self.cell(18, 4, ev_date)
             
-            # Content box on right of spine (X = 36, W = 156)
-            self.set_xy(36, iy)
-            self.set_font("Helvetica", "B", 7.2)
-            self.set_text_color(*self.c_navy)
-            self.cell(100, 4, ev_source[:60])
-            self.set_font("Helvetica", "B", 7.2)
-            self.set_text_color(*self.c_blue)
-            self.cell(52, 4, f"Odom: {ev_odom}", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            # Icon on spine
+            if ev_type == "service" and os.path.exists(wrench_path):
+                self.image(wrench_path, x=30, y=y_pos + 0.5, h=3.5)
+            else:
+                self.set_fill_color(*self.c_green if ev_type == "title" else self.c_red)
+                self.set_draw_color(*self.c_white)
+                self.set_line_width(0.4)
+                self.circle(32, y_pos + 2, 1.8, style="FD")
+                
+            # Mileage
+            self.set_xy(36, y_pos)
+            self.set_font("Helvetica", "B", 7)
+            self.set_text_color(*self.c_dark)
+            self.cell(20, 4, ev_odom)
             
-            self.set_x(36)
+            # Source
+            self.set_x(58)
+            self.set_font("Helvetica", "", 6.5)
+            self.set_text_color(*self.c_gray_text)
+            self.multi_cell(56, 3.2, ev_source)
+            
+            # Description
+            self.set_xy(116, y_pos)
             self.set_font("Helvetica", "", 6.8)
             self.set_text_color(*self.c_dark)
-            self.multi_cell(152, 3.2, ev_desc)
+            self.multi_cell(80, 3.2, ev_desc)
             
-            # Horizontal dashed line divider between events
-            if idx < len(timeline_events) - 1:
-                self.set_draw_color(*self.c_border)
-                self.set_line_width(0.15)
-                self.line(36, iy + 22.5, 194, iy + 22.5)
-
-        # Page 4: Glossary & Signatures
+            # Divider line below event
+            self.set_draw_color(*self.c_border)
+            self.set_line_width(0.15)
+            self.line(12, y_pos + event_h - 2, 198, y_pos + event_h - 2)
+            
+            y_pos += event_h
+            
+        # Glossary & Signatures on a new final page
         self.add_page()
         self.draw_card(12, 24, 186, 120)
         self.set_xy(16, 28)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*self.c_navy)
-        self.cell(178, 4, "VINreport Glossary & Terminology", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(178, 4, "CARFAX Glossary", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.line(16, 33.5, 194, 33.5)
         
         glossary = [
-            ("First Owner", "When the first retail buyer registers the vehicle title with state DMV offices."),
-            ("New Owner Reported", "When title registration is transferred to subsequent owners."),
-            ("Title Issued", "Official state document representing ownership details. Each record is indexed for safety."),
-            ("Odometer Brand", "A designation from state authorities if mileage records are inaccurate or exceed limits."),
-            ("Repossession", "When a financial lender reclaims a vehicle due to missed loan payments.")
+            ("First Owner", "When the first owner(s) obtains a title from a Department of Motor Vehicles as proof of ownership."),
+            ("New Owner Reported", "When a vehicle is sold to a new owner, the Title must be transferred to the new owner(s) at a Department of Motor Vehicles."),
+            ("Ownership History", "CARFAX defines an owner as an individual or business that possesses and uses a vehicle. Not all title transactions represent changes in ownership."),
+            ("Repossession", "When a repossession occurs a vehicle owner fails to make loan payments, and the financial institution holding the title takes possession of the vehicle."),
+            ("Title Issued", "A state issues a title to provide a vehicle owner with proof of ownership. Each title has a unique number.")
         ]
         for idx, (g_title, g_desc) in enumerate(glossary):
             iy = 36 + idx * 21
@@ -5029,7 +5176,7 @@ class EtsyVinreportCarfaxReport(FPDF):
             self.set_text_color(*self.c_dark)
             self.multi_cell(178, 3.5, g_desc)
 
-        # Customer signature card (Y = 160 to 240)
+        # Customer signature card
         self.draw_card(12, 160, 186, 52)
         self.set_xy(16, 164)
         self.set_font("Helvetica", "B", 8)
@@ -5038,10 +5185,9 @@ class EtsyVinreportCarfaxReport(FPDF):
         self.set_x(16)
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*self.c_gray_text)
-        self.cell(178, 4, f"I have reviewed and received a copy of the VINreport history file for VIN: {self.target_vin}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(178, 4, f"I have reviewed and received a copy of the CARFAX Vehicle History Report for this {year} {make} {model} vehicle (VIN:\n{self.target_vin}), which is based on information supplied to CARFAX and available as of {datetime.now().strftime('%m/%d/%Y')} at 9:48 AM.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         
         # Signature lines
-        # Customer Signature
         sy = 196
         self.set_draw_color(*self.c_gray_text)
         self.set_line_width(0.3)
@@ -5058,11 +5204,8 @@ class EtsyVinreportCarfaxReport(FPDF):
         # Dealer Signature
         self.line(135, sy, 175, sy)
         self.set_xy(135, sy + 1.5)
-        self.cell(40, 4, "Authorized Dealer")
+        self.cell(40, 4, "Dealer Signature")
         
-        # Dealer Date
-        self.line(180, sy, 194, sy)
-        self.set_xy(180, sy + 1.5)
         self.cell(14, 4, "Date")
 
 
