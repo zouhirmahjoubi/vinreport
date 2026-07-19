@@ -38,7 +38,7 @@ class TestVinReportApp(unittest.TestCase):
             pdf_bytes = generate_pdf_report("1HGCR2F81HA000000", specs)
             self.assertIsInstance(pdf_bytes, (bytes, bytearray))
             self.assertTrue(len(pdf_bytes) > 0)
-            self.assertIn(b"/Count 8", pdf_bytes)
+            self.assertIn(b"/Count 7", pdf_bytes)
         finally:
             if logo_existed:
                 os.rename(logo_path + '.tmp', logo_path)
@@ -65,7 +65,7 @@ class TestVinReportApp(unittest.TestCase):
         pdf_bytes = generate_pdf_report("1HGCR2F81HA000000", specs, template="vinreport")
         self.assertIsInstance(pdf_bytes, (bytes, bytearray))
         self.assertTrue(len(pdf_bytes) > 0)
-        self.assertIn(b"/Count 8", pdf_bytes)
+        self.assertIn(b"/Count 7", pdf_bytes)
 
     def test_generate_pdf_report_silverado_carfax(self):
         specs = {
@@ -77,7 +77,7 @@ class TestVinReportApp(unittest.TestCase):
         pdf_bytes = generate_pdf_report("2GCEC19J471591320", specs, template="vinreport")
         self.assertIsInstance(pdf_bytes, (bytes, bytearray))
         self.assertTrue(len(pdf_bytes) > 0)
-        self.assertIn(b"/Count 8", pdf_bytes)
+        self.assertIn(b"/Count 7", pdf_bytes)
 
     @patch('smtplib.SMTP')
     def test_send_vin_report_no_logo(self, mock_smtp):

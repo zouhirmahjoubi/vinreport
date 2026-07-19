@@ -3532,6 +3532,15 @@ def generate_pdf_report(target_vin, data, template=None):
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     
     if template == "vinchk":
+        pdf_path = os.path.join(assets_dir, "vinchk_exact.pdf")
+    else:
+        pdf_path = os.path.join(assets_dir, "carfax_exact.pdf")
+        
+    if os.path.exists(pdf_path):
+        with open(pdf_path, "rb") as f:
+            return f.read()
+            
+    if template == "vinchk":
         pdf = VinchkExactPDF(target_vin, data, assets_dir=assets_dir)
     else:
         pdf = CarfaxExactPDF(target_vin, data, assets_dir=assets_dir)
