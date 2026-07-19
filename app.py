@@ -5092,7 +5092,16 @@ class VinchkExactPDF(FPDF):
 
 @app.route('/')
 def read_root():
-    return jsonify({"status": "online", "engine": "Antigravity Agent v2 Gateway Ready"}), 200
+    import subprocess
+    try:
+        git_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("utf-8").strip()
+    except Exception:
+        git_hash = "unknown"
+    return jsonify({
+        "status": "online", 
+        "engine": "Antigravity Agent v2 Gateway Ready",
+        "commit": git_hash
+    }), 200
 
 
 if __name__ == '__main__':
