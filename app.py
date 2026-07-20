@@ -4595,8 +4595,8 @@ class EtsyVinreportCarfaxReport(FPDF):
 
     def _owner_columns(self):
         """Return list of (label, owner_dict) for the 3 comparison columns."""
-        # Count actual owners from the built timeline (used for number of owner bars)
-        actual = 0
+        # Owner 1 bar is drawn on page 1; remaining owners are in the timeline
+        actual = 1  # Owner 1
         tl = getattr(self, "timeline", [])
         for ev in tl:
             if ev[0] == "OWNER":
