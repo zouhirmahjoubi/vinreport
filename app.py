@@ -126,7 +126,7 @@ def clean_pdf_text(text):
     replacements = {
         "\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'",
         "\u2014": "-", "\u2013": "-", "\u2022": "-", "\u2122": "(TM)",
-        "\u00ae": "(R)", "\u00a9": "(C)", "\u20ac": "EUR"
+        "\u00ae": "(R)", "\u20ac": "EUR"
     }
     for k, v in replacements.items():
         s = s.replace(k, v)
@@ -4596,17 +4596,25 @@ class EtsyVinreportCarfaxReport(FPDF):
     def _owner_columns(self):
         """Return list of (label, owner_dict) for the 3 comparison columns."""
         ownerships = self.data.get("title", {}).get("ownerships", []) or []
-        n = len(ownerships)
-        if n == 0:
-            return [("Owners 1-2", {}), ("Owner 3", {}), ("Owner 4", {})]
+        est = (self.data.get("title_ownership_history", {}) or {}).get("totalOwnersCount")
+        if est is None:
+            est = len(ownerships)
+        n = max(est, 1) if isinstance(est, int) else max(len(ownerships), 1)
+        if n == 1:
+            return [("Owner 1", ownerships[0] if ownerships else {}),
+                    ("Owner 2", {}), ("Owner 3", {})]
+        if n == 2:
+            return [("Owner 1", ownerships[0] if ownerships else {}),
+                    ("Owner 2", ownerships[-1] if ownerships else {}),
+                    ("Owner 3", {})]
         if n <= 3:
             cols = [(f"Owner {i+1}", o) for i, o in enumerate(ownerships)]
             while len(cols) < 3:
                 cols.append((f"Owner {len(cols)+1}", {}))
             return cols
-        return [("Owners 1-%d" % (n - 2), ownerships[0]),
-                ("Owner %d" % (n - 1), ownerships[-2]),
-                ("Owner %d" % n, ownerships[-1])]
+        return [("Owners 1-%d" % (n - 2), ownerships[0] if ownerships else {}),
+                ("Owner %d" % (n - 1), ownerships[-2] if len(ownerships) >= 2 else {}),
+                ("Owner %d" % n, ownerships[-1] if ownerships else {})]
 
     # ------------------------------------------------------------------
     # Data aggregation
@@ -5073,14 +5081,11 @@ class EtsyVinreportCarfaxReport(FPDF):
 
         if etype == "service":
             self._img("carfax_icon_wrench_tl.png", 319.6, y + 4.6, w=14)
-
         self._t(self.COL_CMT, y + 5.4, title, bold=True)
         cy = y + 5.4 + 9.9
         for it in items:
             wrapped = self._wrap(it, 218, 8.9)
-            for j, wl in enumerate(wrapped):
-                if j == 0:
-                    self._t(self.COL_CMT, cy, "-")
+            for wl in wrapped:
                 self._t(self.COL_CMT + 3.9, cy, wl)
                 cy += 9.9
         if info:
@@ -5559,7 +5564,7 @@ class EtsyVinreportCarfaxReport(FPDF):
         for wl in self._wrap(legal, 565, 6.7):
             self._t(27.8, cy, wl, size=6.7)
             cy += 7.7
-        self._t(27.8, cy, "(C) 2026 CARFAX, Inc., part of S&P Global. All rights reserved.", size=6.7)
+        self._t(27.8, cy, "\u00a9 2026 CARFAX, Inc., part of S&P Global. All rights reserved.", size=6.7)
         cy += 7.2
         self._t(27.8, cy, self._stamp(now) + " (CDT)", size=6.7)
         cy += 12
