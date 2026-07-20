@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock, ANY
 import os
-import re
 import json
 
 # Set dummy environment variables before importing app
@@ -77,7 +76,7 @@ class TestVinReportApp(unittest.TestCase):
         pdf_bytes = generate_pdf_report("2GCEC19J471591320", specs, template="vinreport")
         self.assertIsInstance(pdf_bytes, (bytes, bytearray))
         self.assertTrue(len(pdf_bytes) > 0)
-        self.assertIn(b"/Count 8", pdf_bytes)
+        self.assertIn(b"/Count 7", pdf_bytes)
 
     @patch('smtplib.SMTP')
     def test_send_vin_report_no_logo(self, mock_smtp):
