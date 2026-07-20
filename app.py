@@ -4595,26 +4595,22 @@ class EtsyVinreportCarfaxReport(FPDF):
 
     def _owner_columns(self):
         """Return list of (label, owner_dict) for the 3 comparison columns."""
-        ownerships = self.data.get("title", {}).get("ownerships", []) or []
-        est = (self.data.get("title_ownership_history", {}) or {}).get("totalOwnersCount")
-        if est is None:
-            est = len(ownerships)
-        n = max(est, 1) if isinstance(est, int) else max(len(ownerships), 1)
+        # Count actual owners from the built timeline (used for number of owner bars)
+        actual = 0
+        tl = getattr(self, "timeline", [])
+        for ev in tl:
+            if ev[0] == "OWNER":
+                actual += 1
+        n = max(actual, 1)
         if n == 1:
-            return [("Owner 1", ownerships[0] if ownerships else {}),
-                    ("Owner 2", {}), ("Owner 3", {})]
+            return [("Owner 1", {}), ("Owner 2", {}), ("Owner 3", {})]
         if n == 2:
-            return [("Owner 1", ownerships[0] if ownerships else {}),
-                    ("Owner 2", ownerships[-1] if ownerships else {}),
-                    ("Owner 3", {})]
-        if n <= 3:
-            cols = [(f"Owner {i+1}", o) for i, o in enumerate(ownerships)]
-            while len(cols) < 3:
-                cols.append((f"Owner {len(cols)+1}", {}))
-            return cols
-        return [("Owners 1-%d" % (n - 2), ownerships[0] if ownerships else {}),
-                ("Owner %d" % (n - 1), ownerships[-2] if len(ownerships) >= 2 else {}),
-                ("Owner %d" % n, ownerships[-1] if ownerships else {})]
+            return [("Owner 1", {}), ("Owner 2", {}), ("Owner 3", {})]
+        if n == 3:
+            return [("Owner 1", {}), ("Owner 2", {}), ("Owner 3", {})]
+        return [("Owners 1-%d" % (n - 2), {}),
+                ("Owner %d" % (n - 1), {}),
+                ("Owner %d" % n, {})]
 
     # ------------------------------------------------------------------
     # Data aggregation
