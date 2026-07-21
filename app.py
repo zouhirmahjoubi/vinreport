@@ -3904,6 +3904,53 @@ def owner_by_vin():
         return jsonify({"status": "failed", "error": f"GoodCar Owner API call failed: {str(e)}"}), 500
 
 
+def fetch_goodcar_recalls(vin):
+    """
+    Query GoodCar Recalls API endpoint (https://goodcar.com/business/api/recall-lookup).
+    Returns JSON response containing open & historical recall records.
+    """
+    goodcar_url = 'https://goodcar.com/business/api/recall-lookup'
+    goodcar_headers = {'Authorization': 'Bearer ' + GOODCAR_API_KEY}
+    goodcar_payload = {'vin': vin}
+    
+    response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+    try:
+        data = response.json()
+    except Exception:
+        data = {"status": response.status_code, "raw_response": response.text}
+    return data, response.status_code
+
+
+@app.route('/api/recalls', methods=['GET', 'POST'])
+@app.route('/recalls', methods=['GET', 'POST'])
+def recall_lookup():
+    """
+    Endpoint to retrieve recall information by VIN using GoodCar Recalls API.
+    Accepts VIN via query string parameter ('vin') or JSON / form body parameter ('vin').
+    """
+    vin = None
+    if request.method == 'POST':
+        body = request.json or request.form or {}
+        vin = body.get('vin')
+    if not vin:
+        vin = request.args.get('vin')
+
+    if not vin:
+        return jsonify({"status": "error", "message": "Missing required 'vin' parameter"}), 400
+
+    vin_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', str(vin).upper())
+    if not vin_match:
+        return jsonify({"status": "error", "message": "Invalid 17-character VIN format"}), 400
+
+    target_vin = vin_match.group(1)
+
+    try:
+        data, status_code = fetch_goodcar_recalls(target_vin)
+        return jsonify(data), status_code
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"GoodCar Recalls API call failed: {str(e)}"}), 500
+
+
 
 
 

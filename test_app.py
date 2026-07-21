@@ -332,5 +332,35 @@ class TestVinReportApp(unittest.TestCase):
             data={'vin': '2GCEC19J471591320'}
         )
 
+    @patch('requests.post')
+    def test_recalls_endpoint(self, mock_post):
+        mock_recall_response = MagicMock()
+        mock_recall_response.status_code = 200
+        mock_recall_response.json.return_value = {
+            "status": 200,
+            "content": {
+                "num_found": 1,
+                "recalls": [
+                    {
+                        "nhtsa_recall_number": "15V313000",
+                        "recall_title": "AIR BAGS:FRONTAL:DRIVER SIDE"
+                    }
+                ]
+            },
+            "remainingBalance": 17.26
+        }
+        mock_post.return_value = mock_recall_response
+
+        response = self.app.get('/recalls?vin=3D3KS28D96G214227')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json.get("status"), 200)
+        self.assertEqual(response.json["content"]["num_found"], 1)
+
+        mock_post.assert_called_once_with(
+            'https://goodcar.com/business/api/recall-lookup',
+            headers={'Authorization': 'Bearer dummy_goodcar_key'},
+            data={'vin': '3D3KS28D96G214227'}
+        )
+
 if __name__ == '__main__':
     unittest.main()
