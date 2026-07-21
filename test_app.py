@@ -297,5 +297,40 @@ class TestVinReportApp(unittest.TestCase):
             template=ANY
         )
 
+    @patch('requests.post')
+    def test_owner_by_vin_endpoint(self, mock_post):
+        mock_owner_response = MagicMock()
+        mock_owner_response.status_code = 200
+        mock_owner_response.json.return_value = {
+            "status": 200,
+            "content": [
+                {
+                    "first_name": "MATTHEW",
+                    "last_name": "GONZALEZ",
+                    "full_address": "877 TAYLOR AVE APT 3E",
+                    "city": "BRONX",
+                    "state": "NY",
+                    "zip": "10473",
+                    "mileage_code": "Y",
+                    "email": "MATTHEWJOSEPHGONZALEZ62@GMAIL.COM",
+                    "phone": 9179827451
+                }
+            ],
+            "remainingBalance": 18.66
+        }
+        mock_post.return_value = mock_owner_response
+
+        response = self.app.get('/owner-by-vin?vin=2GCEC19J471591320')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json.get("status"), 200)
+        self.assertEqual(len(response.json.get("content", [])), 1)
+        self.assertEqual(response.json["content"][0]["first_name"], "MATTHEW")
+
+        mock_post.assert_called_once_with(
+            'https://goodcar.com/business/api/vin-to-owners',
+            headers={'Authorization': 'Bearer dummy_goodcar_key'},
+            data={'vin': '2GCEC19J471591320'}
+        )
+
 if __name__ == '__main__':
     unittest.main()

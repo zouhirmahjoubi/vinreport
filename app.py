@@ -17,7 +17,7 @@ from fpdf.enums import XPos, YPos
 app = Flask(__name__)
 
 # --- TOKENS EXTRACTED SECURELY FROM DOKPLOY ENV ---
-GOODCAR_API_KEY = os.environ.get("GOODCAR_API_KEY")
+GOODCAR_API_KEY = os.environ.get("GOODCAR_API_KEY", "08d423E2Z3UvJDlkPqXnTVwxphbuo0ts")
 ETSY_OAUTH_TOKEN = os.environ.get("ETSY_OAUTH_TOKEN")
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY")
 SMTP_EMAIL = os.environ.get("SMTP_EMAIL")
@@ -3716,6 +3716,9 @@ def send_vin_report(target_vin, customer_email, report_id, data, template=None):
         except Exception as pdf_err:
             print("Failed to attach PDF to email: " + str(pdf_err))
 
+    if not SMTP_EMAIL or not SMTP_PASSWORD:
+        raise Exception("SMTP credentials (SMTP_EMAIL / SMTP_PASSWORD) are not configured in environment variables.")
+
     if SMTP_USE_SSL:
         server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
     else:
@@ -3852,6 +3855,53 @@ def test_report():
     except Exception as e:
         return jsonify({"status": "failed",
                         "error": "Email sending failed: " + str(e)}), 500
+
+
+def fetch_goodcar_owner_by_vin(vin):
+    """
+    Query GoodCar Owner by VIN API endpoint (https://goodcar.com/business/api/vin-to-owners).
+    Returns JSON response containing owner details.
+    """
+    goodcar_url = 'https://goodcar.com/business/api/vin-to-owners'
+    goodcar_headers = {'Authorization': 'Bearer ' + GOODCAR_API_KEY}
+    goodcar_payload = {'vin': vin}
+    
+    response = requests.post(goodcar_url, headers=goodcar_headers, data=goodcar_payload)
+    try:
+        data = response.json()
+    except Exception:
+        data = {"status": response.status_code, "raw_response": response.text}
+    return data, response.status_code
+
+
+@app.route('/api/owner-by-vin', methods=['GET', 'POST'])
+@app.route('/owner-by-vin', methods=['GET', 'POST'])
+def owner_by_vin():
+    """
+    Endpoint to retrieve owner information by VIN using GoodCar Owner by VIN API.
+    Accepts VIN via query string parameter ('vin') or JSON / form body parameter ('vin').
+    """
+    vin = None
+    if request.method == 'POST':
+        body = request.json or request.form or {}
+        vin = body.get('vin')
+    if not vin:
+        vin = request.args.get('vin')
+
+    if not vin:
+        return jsonify({"status": "error", "message": "Missing required 'vin' parameter"}), 400
+
+    vin_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', str(vin).upper())
+    if not vin_match:
+        return jsonify({"status": "error", "message": "Invalid 17-character VIN format"}), 400
+
+    target_vin = vin_match.group(1)
+
+    try:
+        data, status_code = fetch_goodcar_owner_by_vin(target_vin)
+        return jsonify(data), status_code
+    except Exception as e:
+        return jsonify({"status": "failed", "error": f"GoodCar Owner API call failed: {str(e)}"}), 500
 
 
 
